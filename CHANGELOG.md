@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Add `--bg` as a shorthand alias for `mdr up --background`; both forms use the same background-launch path.
+- Add service-style lifecycle commands: `start`, `stop` and safe `restart`. Existing `up/down` remain compatible aliases, and `--bg` remains a shorthand for `--background`.
 
 ## 1.0.1 — 2026-09-20
 

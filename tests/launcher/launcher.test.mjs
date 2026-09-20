@@ -89,13 +89,24 @@ test('launcher: dotenv credentials are data rather than executable shell code',a
  assert.equal((await current(f.stateDir)).state,'ready');await assert.rejects(stat(path.join(f.dir,'should-not-exist')));
 });
 test('launcher: background startup, repeat startup, status and owned shutdown',async t=>{
- const f=await fixture(t);const first=JSON.parse((await f.call('up',['--bg'])).stdout);assert.equal(first.state,'ready');
+ const f=await fixture(t);const first=JSON.parse((await f.call('start',['--bg'])).stdout);assert.equal(first.state,'ready');
  assert.equal(first.health.availability,'ready');assert.equal(first.health.mcp.ok,true);assert.equal(first.health.tunnel.ok,true);
  const second=JSON.parse((await f.call('up',['--background'])).stdout);assert.equal(second.already_running,true);assert.equal(second.run_id,first.run_id);
  const health=await (await fetch(`http://127.0.0.1:${f.mp}/healthz`)).json();assert.equal(health.server,'mcp-dev-runtime');assert.equal(health.version,VERSION);
  assert(!JSON.stringify(await readState(f.stateDir)).includes('local-mock-test-key'));
- const final=JSON.parse((await f.call('down')).stdout);assert.equal(final.state,'stopped');assert.equal((await current(f.stateDir)).state,'stopped');
+ const final=JSON.parse((await f.call('stop')).stdout);assert.equal(final.state,'stopped');assert.equal((await current(f.stateDir)).state,'stopped');
+ assert.equal(JSON.parse((await f.call('down')).stdout).state,'stopped');
  await assert.rejects(fetch(`http://127.0.0.1:${f.mp}/healthz`));
+});
+test('launcher: restart replaces a running instance and starts cleanly when stopped',async t=>{
+ const f=await fixture(t);
+ const first=JSON.parse((await f.call('start',['--bg'])).stdout);assert.equal(first.state,'ready');
+ const restarted=JSON.parse((await f.call('restart',['--bg'])).stdout);
+ assert.equal(restarted.state,'ready');assert.notEqual(restarted.run_id,first.run_id);assert.notEqual(restarted.mcp_pid,first.mcp_pid);
+ assert.equal((await current(f.stateDir)).run_id,restarted.run_id);
+ assert.equal(JSON.parse((await f.call('stop')).stdout).state,'stopped');
+ const fromStopped=JSON.parse((await f.call('restart',['--bg'])).stdout);
+ assert.equal(fromStopped.state,'ready');assert.notEqual(fromStopped.run_id,restarted.run_id);
 });
 test('launcher: first observable ready state includes a complete initial health snapshot',async t=>{
  const f=await fixture(t);await foreground(f,t);
@@ -147,6 +158,7 @@ test('launcher: transient Tunnel readiness failure and recovery update live stat
 test('launcher: down never kills a live PID from an unreachable stale record',async t=>{
  const f=await fixture(t);await mkdir(f.stateDir);await writeFile(path.join(f.stateDir,'supervisor.json'),JSON.stringify({pid:process.pid,run_id:'not-a-controller',control_socket:path.join(f.stateDir,'missing.sock')}));
  await assert.rejects(stopManaged(f.stateDir));assert.equal((await current(f.stateDir)).state,'unreachable');
+ await assert.rejects(f.call('restart',['--bg']),e=>/Supervisor unavailable|ENOENT|connect/i.test(e.stderr));assert.equal((await current(f.stateDir)).state,'unreachable');
 });
 test('launcher: mismatched Tunnel commit is rejected before services start',async t=>{
  const f=await fixture(t);let text=await readFile(f.fake,'utf8');text=text.replaceAll('70bb5a7','abcdef0');await writeFile(f.fake,text,{mode:0o755});

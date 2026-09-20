@@ -174,7 +174,7 @@ The precompiled package includes its fixed Tunnel. `tunnel-setup` checks the bun
 
 ```bash
 mdr tunnel-setup
-mdr up --background
+mdr start --bg
 mdr status
 mdr doctor
 mdr smoke
@@ -184,7 +184,7 @@ Do not also start `mdr serve` or `npm start` on the same ports: `up` already own
 
 The defaults remain MCP `127.0.0.1:3001` and separate Tunnel health `127.0.0.1:9098`. On a conflict, review owned tasks, stop the selected instance, and edit the actual config files reported by `mdr paths`; preserve loopback binding and use distinct free ports. The global `mdr smoke` follows the selected configuration. Changing local ports does not change the Tunnel ID. [Port instructions](DEPLOYMENT.md#ports).
 
-Raw curl probes are optional diagnostics, not additional required setup steps. Logs are outside the binary installation; use the actual Logs path from `mdr paths` and [the log guide](../README.md#logs). `mdr down` stops the owned instance and tasks; it is not a read-only check. Background startup is not OS boot-service installation and does not keep a sleeping computer online.
+Raw curl probes are optional diagnostics, not additional required setup steps. Logs are outside the binary installation; use the actual Logs path from `mdr paths` and [the log guide](../README.md#logs). `mdr stop` stops the owned instance and tasks; it is not a read-only check. `mdr restart --bg` performs the same safe stop before starting a fresh background instance. Legacy `up/down` commands remain aliases. Background startup is not OS boot-service installation and does not keep a sleeping computer online.
 
 **Checkpoint:** local services and diagnostics are ready. Keep the computer awake/online; the following ChatGPT tool call is still required to verify the full round trip.
 

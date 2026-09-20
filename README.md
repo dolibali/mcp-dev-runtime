@@ -194,7 +194,7 @@ mdr doctor --json
 mdr smoke
 ```
 
-All subcommands remain the same, including `mdr up --background` and `mdr down`; the existing credential configuration still applies. `mdr --version` identifies the project as `mcp-dev-runtime`, not a renamed package. Do **not** run `npm install -g mdr` to install this project; it installs an [unrelated Markdown reader](https://github.com/mrchimp/mdr).
+For installed MDR, prefer `mdr start --bg`, `mdr status`, `mdr restart --bg` and `mdr stop`. Existing `mdr up` / `mdr down` remain compatibility aliases for `start` / `stop`, and `--background` remains the long form of `--bg`. `mdr --version` identifies the project as `mcp-dev-runtime`, not a renamed package. Do **not** run `npm install -g mdr` to install this project; it installs an [unrelated Markdown reader](https://github.com/mrchimp/mdr).
 
 Remove only the short entry with `npm run command:uninstall -- --name mdr`. Removing the long entry does not remove the short entry, or vice versa. Specify the same `--bin-dir` when using a custom directory. Neither removal stops services or deletes configuration, logs or history. Registration options: `npm run command:install -- --help`.
 

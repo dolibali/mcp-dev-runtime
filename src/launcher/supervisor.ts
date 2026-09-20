@@ -79,7 +79,7 @@ export async function supervise(o: LaunchOptions) {
     const state=await readState(o.state_dir);
     let owner:{pid:number}|undefined;
     try{owner=JSON.parse(await readFile(path.join(lockDir,'owner.json'),'utf8'));}catch{}
-    if(owner&&alive(owner.pid))throw new Error('Another launcher is active; use status/down, not a second startup.');
+    if(owner&&alive(owner.pid))throw new Error('Another launcher is active; use status/stop, not a second startup.');
     if(!owner && Date.now()-(await stat(lockDir)).mtimeMs<15000)throw new Error('Another launcher is starting; retry status shortly.');
     if(state && alive(state.pid))throw new Error('State belongs to a live process; refusing automatic stale-state cleanup.');
     // Only remove the known files of a dead owner, never a recursive directory tree.

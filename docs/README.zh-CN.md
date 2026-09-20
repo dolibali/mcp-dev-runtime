@@ -194,7 +194,7 @@ mdr doctor --json
 mdr smoke
 ```
 
-其他子命令也保持一致，例如 `mdr up --background` 和 `mdr down`；原有凭据配置仍然适用。`mdr --version` 会显示项目名 `mcp-dev-runtime`，不是重命名后的另一个包。**不要运行 `npm install -g mdr` 来安装本项目**，它安装的是[另一个 Markdown 阅读器](https://github.com/mrchimp/mdr)。
+安装版推荐使用 `mdr start --bg`、`mdr status`、`mdr restart --bg`、`mdr stop` 管理生命周期。原有 `mdr up` / `mdr down` 继续作为 `start` / `stop` 的兼容别名，`--background` 也继续作为 `--bg` 的完整写法。`mdr --version` 会显示项目名 `mcp-dev-runtime`，不是重命名后的另一个包。**不要运行 `npm install -g mdr` 来安装本项目**，它安装的是[另一个 Markdown 阅读器](https://github.com/mrchimp/mdr)。
 
 只移除短入口时运行 `npm run command:uninstall -- --name mdr`。移除长入口不会连带删除短入口，反之亦然；自定义命令目录需传入相同的 `--bin-dir`。移除入口不会停止服务，也不会删除配置、日志或历史。注册选项可通过 `npm run command:install -- --help` 查看。
 

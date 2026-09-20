@@ -70,7 +70,7 @@ v1.0.1 generates one non-secret `config.json` plus adjacent private `runtime.env
 
 ```bash
 mdr tunnel-setup
-mdr up --background
+mdr start --bg
 mdr status
 mdr doctor
 mdr smoke
@@ -80,10 +80,12 @@ The checks are local readiness/discovery, not proof of the ChatGPT round trip. A
 
 ## Upgrade, rollback and source coexistence
 
-Review running tasks and run `mdr down` before switching versions. Download and verify the new archive, then run its installer with the **same prefix and bin directory**. Each version gets its own directory; a `current` symlink is switched atomically after integrity/configuration checks. The installer refuses an active or unreachable selected instance, a changed existing version directory, and foreign command files. It does not delete previous versions or overwrite config. Rollback uses the previous trusted package's installer after stopping the service. Check release notes for history-format compatibility before downgrading.
+Review running tasks and run `mdr stop` before switching versions. Download and verify the new archive, then run its installer with the **same prefix and bin directory**. Each version gets its own directory; a `current` symlink is switched atomically after integrity/configuration checks. The installer refuses an active or unreachable selected instance, a changed existing version directory, and foreign command files. It does not delete previous versions or overwrite config. Rollback uses the previous trusted package's installer after stopping the service. Check release notes for history-format compatibility before downgrading.
 
 An existing source-checkout command is not automatically reassigned to a binary installation. Source config, credentials and `.runtime` are never moved automatically. To coexist, run the binary installer with `--no-global-command` and use the printed absolute installed command path, or use a separate `--bin-dir`. For an explicit migration, stop the old source instance, unregister only its owned commands using its documented command-uninstall operations, then install the binary and deliberately transfer settings in your editor. Avoid two instances on the same ports or history directory.
 
 The immutable v1.0.0 archive provides `./install.sh --unregister` for command-entry removal only. **v1.0.1 adds a complete `./uninstall.sh`.** It shows the exact owned paths first and requires an explicit `y`; it then safely stops the owned managed instance and removes owned commands, all installed versions, configuration/credentials, default state/history, logs and cache. Installation also stores a stable `uninstall.sh` in the user configuration directory, so the original downloaded archive is not required later. Foreign command files and external custom state/log/history paths without sufficient ownership proof are kept rather than recursively deleted.
+
+Lifecycle commands are `mdr start [--background|--bg]`, `mdr stop`, `mdr restart [--background|--bg]` and `mdr status`. `up` and `down` remain aliases for existing scripts. `restart` waits for an owned instance to stop before starting the replacement; it fails closed if the selected controller is unreachable rather than signalling a PID from disk. Restarting or stopping also ends commands owned by that MCP runtime, so inspect active work first.
 
 `mdr serve --transport http` or `mdr serve --transport stdio` remains available for local clients without Tunnel. `serve` preserves the caller's workspace; use explicit `--config` and a separate history directory when running an additional instance. Source development and npm publication are separate: the npm package remains private, and the source `./install.sh` remains a build-oriented installer.

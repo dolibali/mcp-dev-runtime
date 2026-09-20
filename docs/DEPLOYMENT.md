@@ -11,9 +11,9 @@ First-time installation: [English README](../README.md#install) | [中文部署�
 
 For the complete browser-to-terminal walkthrough, including developer mode and where to create keys and copy Tunnel IDs, see [ChatGPT setup](CHATGPT_SETUP.md) / [ChatGPT 新手图文教程](CHATGPT_SETUP.zh-CN.md).
 
-`npm start` runs only the MCP service. `npm run up` manages MCP plus Tunnel when `tunnel.enabled` is true; with `tunnel.enabled: false`, it manages only MCP and requires no Tunnel credentials. Do not run duplicate services on the same ports.
+`npm start` runs only the MCP service. The source-oriented `npm run up/down` scripts remain available; installed/global CLI usage should prefer `mdr start/stop/restart/status`. `start` manages MCP plus Tunnel when `tunnel.enabled` is true; with `tunnel.enabled: false`, it manages only MCP and requires no Tunnel credentials. `up/down` are compatibility aliases for `start/stop`. Do not run duplicate services on the same ports.
 
-The user-facing configuration is one non-secret `config.json`. Internal runtime/launcher objects remain separate, but users no longer need to maintain two files. Unified configuration paths resolve relative to `config.json`; explicit CLI path overrides resolve from the caller. `up` enforces HTTP transport for managed MCP.
+The user-facing configuration is one non-secret `config.json`. Internal runtime/launcher objects remain separate, but users no longer need to maintain two files. Unified configuration paths resolve relative to `config.json`; explicit CLI path overrides resolve from the caller. `start` (and its `up` alias) enforces HTTP transport for managed MCP.
 
 | Setting | Resolution / ownership |
 | --- | --- |
@@ -36,9 +36,9 @@ The user-facing configuration is one non-secret `config.json`. Internal runtime/
 
 These defaults are configuration choices, not ports reserved for this project. Keep a working installation's settings; changing the numbers alone is not a security or performance improvement. No chosen fixed port guarantees freedom from collisions. The launcher checks for conflicts and refuses to take over an unrelated listener instead of silently selecting a different port.
 
-When a port is genuinely occupied, stop only a duplicate instance you own. Choose unused alternatives by changing `mcp.port` and, when enabled, `tunnel.health_port` in the same `config.json`. For example, 53123 / 53124 are possible local alternatives, not guaranteed-free choices. Keep `mcp.host` at `127.0.0.1`. Managed startup requires a fixed MCP port; `mcp.port: 0` is not supported by `up`.
+When a port is genuinely occupied, stop only a duplicate instance you own. Choose unused alternatives by changing `mcp.port` and, when enabled, `tunnel.health_port` in the same `config.json`. For example, 53123 / 53124 are possible local alternatives, not guaranteed-free choices. Keep `mcp.host` at `127.0.0.1`. Managed startup requires a fixed MCP port; `mcp.port: 0` is not supported by `start` / `up`.
 
-Before applying changes, inspect active tasks: `down` stops owned commands. Stop the selected managed instance, edit the same `config.json`, then start again. The launcher generates forwarding/probe URLs from `mcp.*`; do not edit a Tunnel ID to change a local port.
+Before applying changes, inspect active tasks: `stop` (and its `down` alias) stops owned commands. Stop the selected managed instance, edit the same `config.json`, then start again. The launcher generates forwarding/probe URLs from `mcp.*`; do not edit a Tunnel ID to change a local port.
 
 `mdr doctor` and `mdr smoke` follow the selected config. The lower-level `npm run smoke -- URL` and `verify:deployed` still operate on explicit URLs. A changed `curl` URL only probes a different address; it does not change any listener.
 
@@ -48,7 +48,7 @@ Successful setup also registers the current user's command in `~/.local/bin`, un
 
 `mdr` is a convenience entry, not a project rename. Normal setup attempts to register it automatically after the canonical command. If any existing `mdr` executable is found on the current PATH, or the destination is occupied by an unrelated entry, setup skips only the short alias and continues successfully with `mcp-dev-runtime`. Manual `npm run command:install -- --name mdr` remains strict and reports the conflict. Remove only the short entry with `npm run command:uninstall -- --name mdr`. [Short command details](../README.md#short-command) / [短命令说明](README.zh-CN.md#short-command).
 
-For management commands (`up`, `down`, `status`, `doctor`, `smoke`, `paths`, `config`, `tools`, `history-clear`), `--config FILE` selects one unified configuration. Explicit CLI path overrides remain caller-relative; paths stored in unified JSON are config-relative. `serve` retains caller-cwd semantics. Legacy `--launcher-config FILE` remains supported without becoming the new default.
+For management commands (`start`, `stop`, `restart`, compatibility `up/down`, `status`, `doctor`, `smoke`, `paths`, `config`, `tools`, `history-clear`), `--config FILE` selects one unified configuration. Explicit CLI path overrides remain caller-relative; paths stored in unified JSON are config-relative. `serve` retains caller-cwd semantics. Legacy `--launcher-config FILE` remains supported without becoming the new default.
 
 The recommended first-run path is `./install.sh` (or `npm run setup`). It installs the locked npm dependencies, builds the runtime, creates local configuration only when absent, then reuses a compatible Tunnel binary or fetches/builds the exact source pinned by `tunnel.lock.json`. Use `--local-only` to omit Tunnel preparation and `--force-tunnel-build` only for a deliberate rebuild. The installer does not install system packages or provision Platform Tunnel records/credentials.
 

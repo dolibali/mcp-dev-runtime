@@ -173,7 +173,7 @@ try {
   console.log('Configuration preserved; fill missing credentials locally in: ' + config.env_file);
   console.log('Complete uninstall: ' + path.join(l.config_dir, 'uninstall.sh'));
   console.log('Run: ' + shellQuote(path.join(destination, 'bin', 'mcp-dev-runtime')) + ' doctor --offline');
-  console.log('Then: mcp-dev-runtime up --background');
+  console.log('Then: mcp-dev-runtime start --bg');
   console.log('Publisher signing/notarization: SKIPPED. Verify SHA256SUMS from the release before running.');
 } finally {
   if (staging) await rm(staging, { recursive: true, force: true });

@@ -174,7 +174,7 @@ CONTROL_PLANE_API_KEY=replace-with-your-own-runtime-key
 
 ```bash
 mdr tunnel-setup
-mdr up --background
+mdr start --bg
 mdr status
 mdr doctor
 mdr smoke
@@ -184,7 +184,7 @@ mdr smoke
 
 默认仍是 MCP `127.0.0.1:3001` 和独立的 Tunnel 健康端口 `127.0.0.1:9098`。冲突时先检查任务并停止选中的实例，再修改 `mdr paths` 显示的实际配置；保留回环地址，使用互不相同的空闲端口。全局 `mdr smoke` 会跟随当前配置，本地端口变化不影响 Tunnel ID。详见[端口说明](DEPLOYMENT.md#ports)。
 
-原始 curl 探测只作可选排障，不是额外必做步骤。发行版日志在程序目录外，查看 `mdr paths` 显示的实际 Logs 路径及[日志指南](README.zh-CN.md#logs)。`mdr down` 会停止选中的实例及其任务，不是只读检查；后台运行也不是系统开机自启，不能让睡眠电脑持续在线。
+原始 curl 探测只作可选排障，不是额外必做步骤。发行版日志在程序目录外，查看 `mdr paths` 显示的实际 Logs 路径及[日志指南](README.zh-CN.md#logs)。`mdr stop` 会停止选中的实例及其任务，不是只读检查；`mdr restart --bg` 会先执行同样的安全停止，再启动新的后台实例；旧 `up/down` 继续作为别名；后台运行也不是系统开机自启，不能让睡眠电脑持续在线。
 
 **本步完成标志：**本地服务和诊断就绪。保持电脑开机联网；下一步仍需通过 ChatGPT 实际调用来验证完整链路。
 

@@ -18,9 +18,12 @@ const help=`${NAME} ${VERSION}
 Commands:
   init                                Create missing user configuration (binary distribution)
   serve [--transport http|stdio ...]   Run the MCP server without Tunnel
-  up [--background|--bg]              Start managed MCP and Tunnel when enabled
+  start [--background|--bg]           Start managed MCP and Tunnel when enabled
+  stop                                Stop only the managed instance
+  restart [--background|--bg]         Safely stop, then start the managed instance
   status [--verbose|--json]           Show the managed instance
-  down                                Stop only the managed instance
+  up                                  Alias for start
+  down                                Alias for stop
   doctor [--json] [--offline]          Diagnose the installed runtime and selected configuration
   smoke [URL]                         Discover tools and run one harmless command
   paths [--json]                      Show resolved paths used by this installation
@@ -124,9 +127,10 @@ function formatStatus(state: StatusRecord,stateDir:string,verbose=false): string
   return lines.join('\n');
 }
 async function main(){
-  const [command,...originalArgs]=process.argv.slice(2);
-  if(!command||command==='--help'||command==='-h'){console.log(help);return;}
-  if(command==='--version'){console.log(`${NAME} ${VERSION}`);return;}
+  const [rawCommand,...originalArgs]=process.argv.slice(2);
+  if(!rawCommand||rawCommand==='--help'||rawCommand==='-h'){console.log(help);return;}
+  if(rawCommand==='--version'){console.log(`${NAME} ${VERSION}`);return;}
+  const command=rawCommand==='up'?'start':rawCommand==='down'?'stop':rawCommand;
   if(command==='serve'){
     process.argv=[process.argv[0]!,path.join(ROOT,'dist','main.js'),...originalArgs];await import('../main.js');return;
   }
@@ -143,7 +147,7 @@ async function main(){
     for(const file of result.created)console.log('Created: '+file);
     for(const file of result.preserved)console.log('Preserved: '+file);
     console.log('Fill your Tunnel ID and API key locally in: '+result.env_file);
-    console.log('Then run: mcp-dev-runtime up --background');
+    console.log('Then run: mcp-dev-runtime start --bg');
     return;
   }
   if(command==='doctor'){
@@ -287,9 +291,16 @@ async function main(){
   }
   if(command==='versions'){console.log(JSON.stringify({project:NAME,version:VERSION,lock:await readLock()},null,2));return;}
   if(command==='tunnel-setup'){const r=values.build?await buildTunnel():await resolveTunnel(o.tunnel_bin);console.log(JSON.stringify(r,null,2));return;}
-  if(command==='down'){console.log(JSON.stringify(await stopManaged(o.state_dir),null,2));return;}
-  if(command!=='up')throw new Error(`Unknown command: ${command}`);
+  if(command==='stop'){console.log(JSON.stringify(await stopManaged(o.state_dir),null,2));return;}
+  if(command!=='start'&&command!=='restart')throw new Error(`Unknown command: ${rawCommand}`);
   if(layout().mode==='binary'&&!o.runtime_config)throw new Error('User configuration is missing; run mcp-dev-runtime init first.');
+  if(command==='restart'){
+    const before=await current(o.state_dir);
+    // stopped has nothing to stop; stale is safely recovered by supervise().
+    // Any live/unreachable controller goes through stopManaged(), which fails
+    // closed instead of signalling a PID recovered from disk.
+    if(before.state!=='stopped'&&before.state!=='stale')await stopManaged(o.state_dir);
+  }
   const existing=await current(o.state_dir);
   if(existing.state==='ready'||existing.state==='starting'){console.log(JSON.stringify({already_running:true,...existing},null,2));return;}
   if(!values.background){await supervise(o);return;}
@@ -298,7 +309,7 @@ async function main(){
   const log=path.join(o.logs_dir??o.state_dir,'launcher.log');
   try{if((await stat(log)).size>10*1024*1024){await unlink(log+'.1').catch(e=>{if(e.code!=='ENOENT')throw e;});await rename(log,log+'.1');}}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;}
   const fd=await open(log,'a',0o600);
-  const child=spawn(process.execPath,[fileURLToPath(import.meta.url),'up',...args.filter(a=>a!=='--background')],{
+  const child=spawn(process.execPath,[fileURLToPath(import.meta.url),'start',...args.filter(a=>a!=='--background')],{
     cwd:process.cwd(),env:process.env,detached:true,stdio:['ignore',fd.fd,fd.fd]
   });
   let failed=false;child.on('error',()=>{failed=true;});child.on('exit',()=>{failed=true;});child.unref();await fd.close();
