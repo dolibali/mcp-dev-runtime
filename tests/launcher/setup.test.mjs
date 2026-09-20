@@ -68,6 +68,7 @@ test('setup: first full install builds pinned Tunnel path and creates private co
   const first = await f.run();
   assert.match(first.stdout, /setup complete/i);
   assert.equal((await stat(path.join(f.home, '.local/bin/mcp-dev-runtime'))).mode & 0o777, 0o755);
+  await assert.rejects(stat(path.join(f.home, '.local/bin/mdr')), { code: 'ENOENT' });
   assert.equal(await readFile(path.join(f.root, 'config.json'), 'utf8'), await readFile(path.join(f.root, 'config.example.json'), 'utf8'));
   assert.equal(await readFile(path.join(f.root, 'launcher.config.json'), 'utf8'), await readFile(path.join(f.root, 'launcher.config.example.json'), 'utf8'));
   assert.equal((await stat(path.join(f.root, 'runtime.env'))).mode & 0o777, 0o600);

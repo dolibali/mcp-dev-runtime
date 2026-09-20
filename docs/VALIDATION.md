@@ -1,5 +1,11 @@
 # 0.3.0 local validation record
 
+## Optional mdr entry and log documentation — 2026-09-20
+
+This update passed **186 tests** (104 unit, 32 protocol, 50 launcher), with no failures or skips, plus the isolated production-CLI verification. The short entry is opt-in: default setup still registers only `mcp-dev-runtime`. New regressions cover coexistence, independent removal, literal arguments, same-name executable conflicts before and after the destination on PATH, foreign-file/symlink protection, supported-name validation, canonicalized PATH entries and CLI registration. Test fixtures use private temporary directories and do not invoke foreign commands to identify them.
+
+The short and long commands addressed the same isolated managed instance, and the documented absolute log paths matched `status.logs[].file`. Separately, on the maintainer's existing macOS deployment, command-only registration followed by cross-directory `mdr status`, `mdr doctor --json` and `mdr smoke` succeeded without restarting the service or modifying the long-command wrapper. No claim is made that current PATH inspection can see parent-shell aliases/functions, or prevent conflicts introduced by future installations.
+
 ## Global-command update — 2026-09-20
 
 The global-command update passed **179 tests** (104 unit, 32 protocol, 43 launcher), with no failures or skips, plus the isolated production-CLI check. A clean source copy in a disposable HOME passed real `npm run setup -- --local-only`, command registration, cross-directory offline doctor, idempotent reinstallation and command-only removal. These checks used no real Tunnel credentials. Full managed up/status/doctor/smoke/down and stdio were exercised through the registered command in isolated installations; their Tunnel endpoint was an explicitly mocked local process.

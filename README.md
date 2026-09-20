@@ -14,7 +14,7 @@ This is an independent community project, not an OpenAI product. The runtime exe
 
 ## Contents
 
-[Choose a connection](#connection) · [Requirements](#requirements) · [Install](#install) · [Local HTTP / stdio](#local) · [ChatGPT deployment](#chatgpt) · [Tools](#tools) · [History](#history) · [Configuration](#configuration) · [Operations](#operations) · [Troubleshooting](#troubleshooting) · [Validation](#validation) · [Documentation](#documentation)
+[Choose a connection](#connection) · [Requirements](#requirements) · [Install](#install) · [Global command / mdr](#global-command) · [Local HTTP / stdio](#local) · [ChatGPT deployment](#chatgpt) · [Tools](#tools) · [History](#history) · [Configuration](#configuration) · [Operations](#operations) · [Logs](#logs) · [Troubleshooting](#troubleshooting) · [Validation](#validation) · [Documentation](#documentation)
 
 <a id="connection"></a>
 ## Choose a connection
@@ -143,6 +143,34 @@ export PATH="$HOME/.local/bin:$PATH"
 Add that line to the relevant shell startup file for future terminals; the installer does **not** modify `.zshrc`, `.bashrc` or other profiles. An existing unrelated command is never overwritten. A command earlier on PATH is reported rather than silently replaced. Each registered wrapper uses the Node selected at registration; after intentionally removing/moving that Node version, register again with the desired compatible Node.
 
 Remove just this checkout's command with `npm run command:uninstall` from the repository. Configurations, Tunnel, history and running services remain untouched. Unregister before moving the checkout, then register from its new location; an old entry is not silently reassigned to a different source root. Advanced installations can use `npm run command:install -- --bin-dir /absolute/path/to/bin` and the same `--bin-dir` when uninstalling. Use `./install.sh --no-global-command` for CI or embedded installs that must not register a command.
+
+<a id="short-command"></a>
+#### Optional short command: `mdr`
+
+`mdr` is convenient shorthand for **MCP Dev Runtime**, but it is not an exclusive command name: Markdown tools such as [CleverCloud/mdr](https://github.com/CleverCloud/mdr) and [michaelsanford/mdr](https://github.com/michaelsanford/mdr) already use it. The project/package name and default installed command therefore remain `mcp-dev-runtime`. No `mdr` alias is installed automatically.
+
+To opt in on a machine where that name is free, run these commands **from this repository**:
+
+```bash
+type -a mdr || true
+npm run command:install -- --name mdr
+```
+
+Registration checks for an existing `mdr` executable throughout the current PATH, including later entries that a new wrapper could shadow, and refuses conflicts without executing, replacing or deleting the other command. It also refuses foreign files, directories and symlinks at the destination. Shell aliases/functions are not visible to a child installer: inspect `type -a mdr` in your own terminal first. The check describes the PATH at registration time; future installs or different shell environments can still introduce a conflict.
+
+After successful registration and PATH setup, the short command uses the same installation and service as the long command:
+
+```bash
+mdr --help
+mdr --version
+mdr status
+mdr doctor --json
+mdr smoke
+```
+
+All subcommands remain the same, including `mdr up --background` and `mdr down`; the existing credential configuration still applies. `mdr --version` identifies the project as `mcp-dev-runtime`, not a renamed package. Do **not** run `npm install -g mdr` to install this project; it installs an [unrelated Markdown reader](https://github.com/mrchimp/mdr).
+
+Remove only the short entry with `npm run command:uninstall -- --name mdr`. Removing the default long entry does not remove the short entry, or vice versa. Specify the same `--bin-dir` when using a custom directory. Neither removal stops services or deletes configuration, logs or history. Registration options: `npm run command:install -- --help`.
 
 <a id="npm-arguments"></a>
 **Why is there a separate `--`?** In `npm run doctor -- --json`, `npm run doctor` selects this project's diagnostic script, the standalone `--` tells npm to forward the following arguments, and `--json` is an option for that script. It is not a typo or an extra dash to remove. For normal interactive checks, simply use `npm run doctor`; add `-- --json` when you need the script's JSON output. The script invocation is `node scripts/doctor.mjs --json`; direct Node invocation does not need npm's separator. See the [official npm argument-passing reference](https://docs.npmjs.com/cli/v12/commands/npm-run/).
@@ -410,7 +438,51 @@ node dist/launcher/cli.js history-clear --config config.json --confirm
 
 This is destructive to the selected history. It refuses an active writer and does not delete source code or unrelated command-generated files. Turning capture off does not erase previously saved data.
 
-MCP and Tunnel diagnostic logs rotate during operation: by default 10 MiB per file, three files per stream including the current one. `.runtime/launcher.log` is a low-volume lifecycle log with startup-time rotation. Temporary readiness failures update health instead of rerunning commands; an actual managed child exit still triggers coordinated shutdown. See [deployment details](docs/DEPLOYMENT.md).
+Temporary readiness failures update health instead of rerunning commands; an actual managed child exit still triggers coordinated shutdown. See [deployment details](docs/DEPLOYMENT.md).
+
+<a id="logs"></a>
+## Logs: location, viewing and error investigation
+
+For a launcher-managed installation (`up`), diagnostic logs live in the launcher's **state directory**, which defaults to `.runtime/` inside the installation directory. This is **not** `~/.local/bin` and does not change when you run the global command from another project.
+
+| Default path, relative to the installation | Contents |
+| --- | --- |
+| `.runtime/mcp.log` | MCP service diagnostics, startup messages and errors |
+| `.runtime/tunnel.log` | Tunnel connection, readiness and network diagnostics |
+| `.runtime/launcher.log` | Background launcher output; created by `up --background` |
+| `.runtime/mcp.log.1`, `.runtime/mcp.log.2` | Older MCP log segments, when rotation has occurred |
+| `.runtime/tunnel.log.1`, `.runtime/tunnel.log.2` | Older Tunnel log segments, when rotation has occurred |
+
+There is **no separate `error.log`**: service errors share the appropriate component's diagnostic stream. Start with `mcp-dev-runtime status` and `mcp-dev-runtime doctor` (or `mdr status` / `mdr doctor` after registering the short command), then inspect the relevant file. Background startup failures belong in `launcher.log`, MCP process/protocol diagnostics in `mcp.log`, and Tunnel connection/authentication/proxy/TLS diagnostics in `tunnel.log` when emitted. These files combine the managed child's stdout and stderr rather than separating warnings and errors into another file.
+
+Replace the example path with your installation directory, then view recent service logs:
+
+```bash
+cd /path/to/mcp-dev-runtime
+tail -n 100 .runtime/mcp.log .runtime/tunnel.log
+```
+
+To follow new output across log rotation:
+
+```bash
+tail -F .runtime/mcp.log .runtime/tunnel.log
+```
+
+Press **Ctrl+C** to stop following the logs; this does not stop MCP or Tunnel. For background-launch failures, also inspect `tail -n 100 .runtime/launcher.log`. A file may not exist before its component has started or emitted its first log message; `launcher.log` is not created by a foreground-only launch. `tail -F` can wait for files to appear. Tunnel runs at warning level by default, so an empty or not-yet-created Tunnel log does not by itself mean a failure.
+
+From the same installation directory, search both current and rotated logs for likely errors, with line numbers and three lines of context on either side:
+
+```bash
+grep -nEi -C 3 'error|failed|failure|exception|panic|timeout|timed out|ECONN|EADDR|ENOTFOUND|EACCES|401|403' .runtime/*.log*
+```
+
+Keyword matching is not an error classifier: no match is not proof of health, and `grep` normally exits with status 1 when nothing matches. A matching word is not automatically a service outage either. Preserve the surrounding context, compare timestamps with the failing operation, and check the current `doctor` result. Use the real state-directory paths below instead of `.runtime/` when customized. Avoid sharing raw `runtime.env` or complete private logs; review/redact paths, command content, Tunnel IDs and secrets first.
+
+**Custom directory:** `state_dir` in the selected `launcher.config.json` controls these paths. Relative JSON paths resolve from that configuration file, while a CLI `--state-dir` resolves from the caller. Use the same configuration/override for `up`, `status` and `down`. On a reachable managed instance, `mcp-dev-runtime status` (or registered `mdr status`) includes the absolute MCP/Tunnel filenames in `logs[].file`. Read those paths instead of assuming a custom installation still uses `.runtime/`.
+
+**Service logs are not command-output history.** When a build, test or shell command fails, inspect its returned `output` and actual `exit_code`, and continue that session with `write_stdin` if necessary. Disk execution history separately defaults to `.mcp-dev-runtime/history/` under the runtime's configured `cwd`; `history.directory` in the runtime configuration can move it elsewhere, for example `.runtime/history/`. Raw tool stdout/stderr is not saved there by default: enable `capture_output: true` when starting a task to preserve its bounded archive. Query it through the [history tools](#history), not by expecting every build's output in `mcp.log`.
+
+MCP and Tunnel diagnostic logs rotate during writes: `log_max_bytes` defaults to 10 MiB and `log_files` defaults to three files per stream, including the current file. These settings are in the launcher configuration. The low-volume background `launcher.log` has separate startup-time rotation. Standalone `npm start` / `serve` output goes to its terminal, and stdio diagnostics to the launching client's stderr; those modes do not create the managed diagnostic files automatically. Logs and history can contain private paths, code or credentials: keep them out of Git and review/redact them before sharing.
 
 <a id="troubleshooting"></a>
 ## Troubleshooting

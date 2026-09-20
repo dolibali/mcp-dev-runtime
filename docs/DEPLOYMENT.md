@@ -39,6 +39,8 @@ Before applying changes, inspect active tasks: `down` stops owned commands. Stop
 
 Successful setup also registers the current user's command in `~/.local/bin`, unless `--no-global-command` is specified. Existing deployments may run `npm run command:install` without re-running setup or restarting a service. Registration reuses this checkout and its Node executable; it is not another installation and does not edit shell profiles. [English global command guide](../README.md#global-command) / [中文说明](README.zh-CN.md#global-command).
 
+`mdr` is an optional short entry, not a project rename or a default install. Use `npm run command:install -- --name mdr` only after checking your shell for conflicts; existing `mdr` executables anywhere on the current PATH cause refusal. The long command remains available. Remove only the short entry with `npm run command:uninstall -- --name mdr`. [Short command details](../README.md#short-command) / [短命令说明](README.zh-CN.md#short-command).
+
 For management commands (`up`, `down`, `status`, `doctor`, `smoke`, `history-clear`), the CLI first resolves explicit relative file/directory flags against the caller's directory, then uses the installation root as its working-directory base. This aligns doctor/history with the MCP child already launched from that root. `serve` retains caller-cwd semantics. Paths stored inside launcher JSON still resolve against that JSON file. The global `smoke` command follows the selected runtime configuration; `npm run smoke` remains the lower-level URL-based script.
 
 The recommended first-run path is `./install.sh` (or `npm run setup`). It installs the locked npm dependencies, builds the runtime, creates local configuration only when absent, then reuses a compatible Tunnel binary or fetches/builds the exact source pinned by `tunnel.lock.json`. Use `--local-only` to omit Tunnel preparation and `--force-tunnel-build` only for a deliberate rebuild. The installer does not install system packages or provision Platform Tunnel records/credentials.
@@ -110,6 +112,8 @@ Do not use a secret key as a CLI argument. Keep local credential files outside s
 When a proxy is required, preserve loopback exclusions with `NO_PROXY=localhost,127.0.0.1,::1`. Changing environment variables in another terminal does not modify an already-running process; restart deliberately after checking active tasks. Do not disable TLS verification to suppress certificate failures.
 
 ## State, history and diagnostic logs
+
+For the file-by-file directory table and `tail -F` examples, see [README log instructions](../README.md#logs) / [中文日志目录与查看方法](README.zh-CN.md#logs). On a reachable managed instance, `mcp-dev-runtime status` (or registered `mdr status`) exposes absolute service log paths in `logs[].file`.
 
 The default `.runtime/` directory contains supervisor state, locks, a private control socket, Tunnel build caches and diagnostic logs. Disk execution history instead defaults to `.mcp-dev-runtime/history` relative to runtime `cwd`; configuring `.runtime/history` is an explicit deployment choice, not an automatic relocation.
 

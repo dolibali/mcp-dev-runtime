@@ -99,6 +99,8 @@ cd mcp-dev-runtime
 
 安装器还会注册 `~/.local/bin/mcp-dev-runtime`。如果它提示补充 PATH，先按提示操作，再使用全局命令；下面原有的 `npm run ...` 命令仍可在仓库目录使用。注册不会修改 Shell 启动文件，也不会自动启动服务。详见[全局命令使用说明](README.zh-CN.md#global-command)。
 
+日常输入可以选择注册 [`mdr` 短命令](README.zh-CN.md#short-command)，不会覆盖已有同名工具。服务日志保存位置和查看命令见 [README 日志说明](README.zh-CN.md#logs)。
+
 <a id="step-3"></a>
 ## 第 3 步：创建 Tunnel，找到真正的 Tunnel ID
 

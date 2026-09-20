@@ -99,6 +99,8 @@ Keep the default listener on `127.0.0.1`; do not expose this unrestricted runtim
 
 Setup also registers `~/.local/bin/mcp-dev-runtime`. If it prints a PATH instruction, apply that instruction before using the global command; otherwise the existing `npm run ...` commands below remain usable from this repository. Registration never changes your shell profiles or starts a service. See [global command usage](../README.md#global-command).
 
+For shorter typing, optionally register [`mdr`](../README.md#short-command); existing same-named tools are not overwritten. Service log locations and viewing commands are listed in [the README log guide](../README.md#logs).
+
 <a id="step-3"></a>
 ## Step 3 — Create a Tunnel and find its real ID
 

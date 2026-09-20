@@ -14,7 +14,7 @@
 
 ## 目录
 
-[选择接入方式](#connection) · [环境要求](#requirements) · [安装](#install) · [本地 HTTP / stdio](#local) · [ChatGPT 部署](#chatgpt) · [工具能力](#tools) · [执行历史](#history) · [配置说明](#configuration) · [日常维护](#operations) · [常见问题](#troubleshooting) · [测试验证](#validation) · [文档索引](#documentation)
+[选择接入方式](#connection) · [环境要求](#requirements) · [安装](#install) · [全局命令 / mdr](#global-command) · [本地 HTTP / stdio](#local) · [ChatGPT 部署](#chatgpt) · [工具能力](#tools) · [执行历史](#history) · [配置说明](#configuration) · [日常维护](#operations) · [日志目录与查看](#logs) · [常见问题](#troubleshooting) · [测试验证](#validation) · [文档索引](#documentation)
 
 <a id="connection"></a>
 ## 选择接入方式
@@ -143,6 +143,34 @@ export PATH="$HOME/.local/bin:$PATH"
 把这行加入对应 Shell 的启动文件，可以让后续终端也生效；安装器**不会擅自修改** `.zshrc`、`.bashrc` 等文件。同名但不属于本项目的命令不会被覆盖；PATH 中有优先命令时会明确提示。入口使用注册时选定的 Node；主动删除或迁移该 Node 版本后，应使用兼容的新 Node 重新注册。
 
 只移除当前源码目录注册的命令，可在仓库中运行 `npm run command:uninstall`，不会删除配置、Tunnel、历史或停止服务。迁移源码目录前先移除入口，再从新位置注册；安装器不会默默把旧入口改指向另一份源码。高级安装可以指定 `npm run command:install -- --bin-dir /absolute/path/to/bin`，卸载时使用相同的 `--bin-dir`。CI 或嵌入式部署不需要全局入口时，用 `./install.sh --no-global-command` 跳过注册。
+
+<a id="short-command"></a>
+#### 可选短命令：`mdr`
+
+`mdr` 适合作为 **MCP Dev Runtime** 的日常缩写，但不是独占名称：[CleverCloud/mdr](https://github.com/CleverCloud/mdr)、[michaelsanford/mdr](https://github.com/michaelsanford/mdr) 等 Markdown 工具已在使用它。因此，项目名、包名和默认安装命令仍保留 `mcp-dev-runtime`，不会自动给所有用户注册 `mdr`。
+
+确认自己的机器未使用同名命令后，可以**在本项目目录中**主动注册短入口：
+
+```bash
+type -a mdr || true
+npm run command:install -- --name mdr
+```
+
+注册器会检查当前 PATH 中的全部 `mdr` 可执行文件，包括可能被新入口遮挡的后续目录；发现冲突就拒绝，不会执行、覆盖或删除对方命令。目标位置已有无关文件、目录或符号链接时也会拒绝。子进程看不到当前交互 Shell 的别名或函数，因此先在自己的终端检查 `type -a mdr`。此检查仅反映注册当时的 PATH，后续安装其他软件或切换 Shell 环境仍可能引入冲突。
+
+注册成功且命令目录已加入 PATH 后，短命令与长命令使用同一份安装和服务：
+
+```bash
+mdr --help
+mdr --version
+mdr status
+mdr doctor --json
+mdr smoke
+```
+
+其他子命令也保持一致，例如 `mdr up --background` 和 `mdr down`；原有凭据配置仍然适用。`mdr --version` 会显示项目名 `mcp-dev-runtime`，不是重命名后的另一个包。**不要运行 `npm install -g mdr` 来安装本项目**，它安装的是[另一个 Markdown 阅读器](https://github.com/mrchimp/mdr)。
+
+只移除短入口时运行 `npm run command:uninstall -- --name mdr`。默认移除长入口不会连带删除短入口，反之亦然；自定义命令目录需传入相同的 `--bin-dir`。移除入口不会停止服务，也不会删除配置、日志或历史。注册选项可通过 `npm run command:install -- --help` 查看。
 
 <a id="npm-arguments"></a>
 **命令中间的 `--` 是什么意思？** 在 `npm run doctor -- --json` 中，`npm run doctor` 选择本项目的诊断脚本，单独的 `--` 告诉 npm 将后面的参数传给脚本，`--json` 才是脚本的输出选项。这不是笔误，也不是可以随意删除的多余横线。日常人工检查直接运行 `npm run doctor` 即可；需要脚本输出 JSON 时再加 `-- --json`。它调用的脚本是 `node scripts/doctor.mjs --json`；直接使用 Node 时不需要 npm 的分隔符。参考 [npm 官方参数传递说明](https://docs.npmjs.com/cli/v12/commands/npm-run/)。
@@ -418,7 +446,51 @@ node dist/launcher/cli.js history-clear --config config.json --confirm
 
 这个操作会删除选定历史，存在活动写入者时会拒绝；不会删除源码或其他命令生成的无关文件。关闭日志捕获不会自动删除以前保存的数据。
 
-MCP 与 Tunnel 诊断日志会在运行期间轮转，默认每个文件 10 MiB，每条日志流保留三份，包含当前文件。低频的 `.runtime/launcher.log` 在启动时轮转。临时就绪探测失败只更新状态，不重跑命令；受管子进程实际退出时，仍执行协调关闭。更多细节见[部署说明](DEPLOYMENT.md)。
+临时就绪探测失败只更新状态，不重跑命令；受管子进程实际退出时，仍执行协调关闭。更多细节见[部署说明](DEPLOYMENT.md)。
+
+<a id="logs"></a>
+## 日志目录、查看方法与错误排查
+
+通过启动器 `up` 管理的服务，诊断日志保存在启动器的**状态目录**中，默认是安装目录下的 `.runtime/`。不是 `~/.local/bin`，也不会因为你在另一个项目目录执行全局命令就换位置。
+
+| 默认路径，相对于安装目录 | 内容 |
+| --- | --- |
+| `.runtime/mcp.log` | MCP 服务诊断、启动消息和错误 |
+| `.runtime/tunnel.log` | Tunnel 连接、就绪状态和网络诊断 |
+| `.runtime/launcher.log` | 后台启动器输出，由 `up --background` 创建 |
+| `.runtime/mcp.log.1`、`.runtime/mcp.log.2` | 已发生轮转时保留的较旧 MCP 日志 |
+| `.runtime/tunnel.log.1`、`.runtime/tunnel.log.2` | 已发生轮转时保留的较旧 Tunnel 日志 |
+
+**没有单独的 `error.log`**，服务错误与对应组件的诊断一起记录。先运行 `mcp-dev-runtime status`、`mcp-dev-runtime doctor`（注册短命令后也可用 `mdr status`、`mdr doctor`），再查看相关文件：后台启动失败看 `launcher.log`，MCP 进程或协议问题看 `mcp.log`，Tunnel 输出的连接、认证、代理 / TLS 问题看 `tunnel.log`。受管子进程的 stdout 和 stderr 合并到对应日志，不会把 warning 和 error 另外拆成一个文件。
+
+先将示例路径替换为你的安装目录，再查看最近的服务日志：
+
+```bash
+cd /path/to/mcp-dev-runtime
+tail -n 100 .runtime/mcp.log .runtime/tunnel.log
+```
+
+持续查看新输出，并在日志轮转后继续跟随：
+
+```bash
+tail -F .runtime/mcp.log .runtime/tunnel.log
+```
+
+按 **Ctrl+C** 只会停止查看日志，不会停止 MCP 或 Tunnel。排查后台启动失败时，也可以执行 `tail -n 100 .runtime/launcher.log`。相关组件尚未启动或尚未输出第一条消息时，日志文件可能还不存在；只使用前台启动不会创建 `launcher.log`。`tail -F` 可以继续等待文件出现。Tunnel 默认记录 warning 及以上级别，因此日志为空或尚未创建，本身不代表故障。
+
+仍在安装目录中，可用下面的命令同时搜索当前和已经轮转的日志，显示行号及前后三行上下文：
+
+```bash
+grep -nEi -C 3 'error|failed|failure|exception|panic|timeout|timed out|ECONN|EADDR|ENOTFOUND|EACCES|401|403' .runtime/*.log*
+```
+
+关键词搜索不是错误判定器：没有命中不代表服务健康，`grep` 没有匹配时正常返回退出码 1；命中一个词也不一定代表服务不可用。保留前后上下文，对照出错操作的时间和当前 `doctor` 结果。改过状态目录时，使用下面说明的实际路径，不要继续照抄 `.runtime/`。不要直接分享 `runtime.env` 或完整私人日志，先检查并脱敏路径、命令内容、Tunnel ID 和秘密值。
+
+**改过目录时：**所选 `launcher.config.json` 的 `state_dir` 决定这些日志的路径。JSON 中的相对路径以该配置文件为基准，命令行 `--state-dir` 的相对路径以调用目录为基准。`up`、`status`、`down` 要使用相同的配置或覆盖项。受管实例可连接时，`mcp-dev-runtime status`（或已注册的 `mdr status`）会在 `logs[].file` 中显示 MCP / Tunnel 日志的绝对路径；自定义安装应以这些路径为准，不能继续假定是 `.runtime/`。
+
+**服务日志不等于命令输出历史。**构建、测试或 Shell 命令失败时，应查看工具返回的 `output` 和真实 `exit_code`，必要时用 `write_stdin` 继续读取该会话。磁盘执行历史默认在运行时配置的 `cwd` 下的 `.mcp-dev-runtime/history/`；运行时配置中的 `history.directory` 可以将其改到其他位置，例如 `.runtime/history/`。默认不保存工具的原始 stdout/stderr，需要保留某次构建日志时，在启动任务时设置 `capture_output: true`，再通过[历史工具](#history)查询有容量上限的档案，而不是到 `mcp.log` 中找每一条构建输出。
+
+MCP 与 Tunnel 的诊断日志按写入量轮转：启动器配置的 `log_max_bytes` 默认 10 MiB，`log_files` 默认每条日志流保留三份，包含当前文件。低频的后台 `launcher.log` 单独在启动时轮转。独立 `npm start` / `serve` 的输出在对应终端，stdio 诊断在启动客户端的 stderr；这些方式不会自动生成受管服务的日志文件。日志和历史可能包含私人路径、代码或凭据，不应提交 Git，分享前需要审阅并脱敏。
 
 <a id="troubleshooting"></a>
 ## 常见问题

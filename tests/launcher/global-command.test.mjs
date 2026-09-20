@@ -13,6 +13,11 @@ import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 
 const exec = promisify(execFile);
 const repo = process.cwd();
+async function withPath(value, callback) {
+  const previous = process.env.PATH;
+  try { process.env.PATH = value; return await callback(); }
+  finally { if (previous === undefined) delete process.env.PATH; else process.env.PATH = previous; }
+}
 async function fixture(t) {
   const dir = await realpath(await mkdtemp(path.join(tmpdir(), 'gcli-')));
   const root = path.join(dir, "项目 ' $HOME"), binDir = path.join(dir, 'user bin'), caller = path.join(dir, 'elsewhere');
@@ -104,6 +109,103 @@ test('global command: missing build never creates a command; concurrent installs
   assert.equal((await exec(path.join(f.binDir, 'mcp-dev-runtime'))).stdout, 'complete\n');
 });
 
+test('short command: mdr and the canonical command coexist, forward literal arguments and uninstall independently', async t => {
+  const f = await fixture(t);
+  await withPath(f.binDir, async () => {
+    const canonical = await installCommand(f);
+    const short = await installCommand({ ...f, name: 'mdr' });
+    assert.equal(short.path, path.join(f.binDir, 'mdr'));
+    assert.equal(short.name, 'mdr'); assert.equal(short.in_path, true); assert.equal(short.shadowed_by, null);
+    assert.equal((await installCommand({ ...f, name: 'mdr' })).status, 'unchanged');
+    const args = ['doctor', '--config=含 空格.json', '$(touch unwanted)', "'literal'"];
+    const a = await exec(short.path, args, { cwd: f.caller });
+    const b = await exec(canonical.path, args, { cwd: f.caller });
+    assert.equal(a.stdout, b.stdout); assert.deepEqual(JSON.parse(a.stdout).args, args);
+    assert.equal((await removeCommand({ ...f, name: 'mdr' })).status, 'removed');
+    assert.equal((await removeCommand({ ...f, name: 'mdr' })).status, 'absent');
+    assert((await stat(canonical.path)).isFile());
+    await assert.rejects(stat(path.join(f.caller, 'unwanted')), { code: 'ENOENT' });
+  });
+});
+
+for (const order of ['before', 'after']) {
+  test(`short command: refuses an existing mdr ${order} the destination on PATH without executing it`, async t => {
+    const f = await fixture(t), otherDir = path.join(f.dir, 'another-program');
+    await mkdir(otherDir);
+    const other = path.join(otherDir, 'mdr');
+    const marker = path.join(f.dir, 'mdr-should-not-run');
+    const content = `#!/bin/sh\nprintf unexpected > '${marker}'\n`;
+    await writeFile(other, content, { mode: 0o755 });
+    const dirs = order === 'before' ? [otherDir, f.binDir] : [f.binDir, otherDir];
+    await withPath(dirs.join(path.delimiter), async () => {
+      await assert.rejects(installCommand({ ...f, name: 'mdr' }), /conflicts with an existing executable/);
+      await assert.rejects(stat(path.join(f.binDir, 'mdr')), { code: 'ENOENT' });
+      assert.equal(await readFile(other, 'utf8'), content);
+      await assert.rejects(stat(marker), { code: 'ENOENT' });
+      assert.equal((await installCommand(f)).status, 'created');
+    });
+  });
+}
+
+test('short command: foreign files, other checkouts and symlinks are never replaced or removed', async t => {
+  const f = await fixture(t); await mkdir(f.binDir);
+  const dest = path.join(f.binDir, 'mdr');
+  await withPath(f.binDir, async () => {
+    await writeFile(dest, 'other mdr', { mode: 0o644 });
+    await assert.rejects(installCommand({ ...f, name: 'mdr' }), /another installation or program/);
+    await assert.rejects(removeCommand({ ...f, name: 'mdr' }), /another installation or program/);
+    assert.equal(await readFile(dest, 'utf8'), 'other mdr'); await rm(dest);
+    await symlink(path.join(f.dir, 'missing'), dest);
+    await assert.rejects(installCommand({ ...f, name: 'mdr' }), /unrelated command/);
+    await assert.rejects(removeCommand({ ...f, name: 'mdr' }), /unrelated command/); await rm(dest);
+    await installCommand({ ...f, name: 'mdr' });
+    const other = path.join(f.dir, 'other-root'); await mkdir(path.join(other, 'dist/launcher'), { recursive: true });
+    await writeFile(path.join(other, 'dist/launcher/cli.js'), '');
+    await assert.rejects(installCommand({ ...f, root: other, name: 'mdr' }), /another installation or program/);
+    await assert.rejects(removeCommand({ ...f, root: other, name: 'mdr' }), /another installation or program/);
+  });
+});
+
+test('short command: only supported names are accepted, including before any filesystem changes', async t => {
+  const f = await fixture(t);
+  for (const name of ['', '../mdr', '/tmp/mdr', 'mdr\n', 'ls', null]) {
+    await assert.rejects(installCommand({ ...f, name }), /Command name must be/);
+    await assert.rejects(removeCommand({ ...f, name }), /Command name must be/);
+  }
+  await assert.rejects(stat(f.binDir), { code: 'ENOENT' });
+});
+
+test('short command: canonicalized PATH entries allow reuse of the same owned alias and mode repair', async t => {
+  const f = await fixture(t);
+  await withPath(f.binDir, async () => {
+    const r = await installCommand({ ...f, name: 'mdr' });
+    const linkedDir = path.join(f.dir, 'bin-link'); await symlink(f.binDir, linkedDir, 'dir');
+    process.env.PATH = [linkedDir, f.binDir].join(path.delimiter);
+    const same = await installCommand({ ...f, name: 'mdr' });
+    assert.equal(same.status, 'unchanged'); assert.equal(same.shadowed_by, null);
+    await chmod(r.path, 0o600);
+    assert.equal((await installCommand({ ...f, name: 'mdr' })).status, 'unchanged');
+    assert.equal((await stat(r.path)).mode & 0o777, 0o755);
+  });
+});
+
+test('short command CLI: --name opts in, defaults remain long, and command-only removal selects one entry', async t => {
+  const f = await fixture(t); await mkdir(path.join(f.root, 'scripts'));
+  const script = path.join(f.root, 'scripts/global-command.mjs');
+  await cp(path.join(repo, 'scripts/global-command.mjs'), script);
+  const call = args => exec(process.execPath, [script, '--bin-dir', f.binDir, ...args], {
+    cwd: f.caller, env: { ...process.env, HOME: f.dir, PATH: f.binDir }, timeout: 5000
+  });
+  await call([]);
+  await assert.rejects(stat(path.join(f.binDir, 'mdr')), { code: 'ENOENT' });
+  assert.match((await call(['--name', 'mdr'])).stdout, /Global command created/);
+  assert.match((await call(['--name', 'mdr'])).stdout, /Global command unchanged/);
+  await call(['--name', 'mdr', '--remove']);
+  await assert.rejects(stat(path.join(f.binDir, 'mdr')), { code: 'ENOENT' });
+  assert((await stat(path.join(f.binDir, 'mcp-dev-runtime'))).isFile());
+  await assert.rejects(call(['--name', '../bad']), /Command name must be/);
+});
+
 async function port() {
   return new Promise((resolve, reject) => {
     const s = createServer(); s.on('error', reject);
@@ -151,6 +253,15 @@ test('global CLI: default config, doctor, smoke, repeat up and down address one 
   await writeFile(path.join(f.caller, 'config.json'), '{"unexpected":true}');
   const first = JSON.parse((await f.run(['up', '--background', '--env-file', '../test.env'])).stdout);
   assert.equal(first.state, 'ready');
+  const short = await withPath(f.binDir, () => installCommand({ ...f, name: 'mdr' }));
+  const shortRun = args => exec(short.path, args, { cwd: f.caller, env: f.env, timeout: 25000 });
+  const shortState = JSON.parse((await shortRun(['status'])).stdout);
+  assert.equal(shortState.run_id, first.run_id);
+  assert.equal(shortState.mcp_instance, first.mcp_instance);
+  assert.deepEqual(shortState.logs.map(s => s.file).sort(), [path.join(f.state, 'mcp.log'), path.join(f.state, 'tunnel.log')]);
+  const shortDoctor = JSON.parse((await shortRun(['doctor', '--json'])).stdout);
+  assert.equal(shortDoctor.ok, true); assert.equal(shortDoctor.supervisor.run_id, first.run_id);
+  assert.match((await shortRun(['smoke'])).stdout, /LOCAL MCP SMOKE PASSED/);
   const again = JSON.parse((await f.run(['up', '--background'], f.dir)).stdout);
   assert.equal(again.run_id, first.run_id); assert.equal(again.already_running, true);
   const d = JSON.parse((await f.run(['doctor', '--json'])).stdout);
