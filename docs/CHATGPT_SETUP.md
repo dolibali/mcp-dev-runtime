@@ -97,9 +97,9 @@ Keep the default listener on `127.0.0.1`; do not expose this unrestricted runtim
 
 **Checkpoint:** the script ends with `MCP Dev Runtime setup complete` and the offline diagnostic passes. This confirms local installation, not a live ChatGPT connection.
 
-Setup also registers `~/.local/bin/mcp-dev-runtime`. If it prints a PATH instruction, apply that instruction before using the global command; otherwise the existing `npm run ...` commands below remain usable from this repository. Registration never changes your shell profiles or starts a service. See [global command usage](../README.md#global-command).
+Setup also registers `~/.local/bin/mcp-dev-runtime` and, when the name is free, automatically registers the shorter `mdr` entry. An existing unrelated `mdr` is never overwritten; setup simply skips the short alias and continues. If setup prints a PATH instruction, apply that instruction before using the global command; otherwise the existing `npm run ...` commands below remain usable from this repository. Registration never changes your shell profiles or starts a service. See [global command usage](../README.md#global-command).
 
-For shorter typing, optionally register [`mdr`](../README.md#short-command); existing same-named tools are not overwritten. Service log locations and viewing commands are listed in [the README log guide](../README.md#logs).
+For shorter typing, use [`mdr`](../README.md#short-command) when setup reports that it was registered; existing same-named tools are never overwritten. Service log locations and viewing commands are listed in [the README log guide](../README.md#logs).
 
 <a id="step-3"></a>
 ## Step 3 — Create a Tunnel and find its real ID

@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { installCommand, printCommandResult } from './global-command.mjs';
+import { COMMAND_CONFLICT, installCommand, printCommandResult } from './global-command.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const argv = process.argv.slice(2);
@@ -181,15 +181,30 @@ if (localOnly) {
 step('Running offline configuration diagnostics...');
 await run('npm', ['run', 'doctor', '--', '--config', 'config.json', '--offline']);
 
+let shortCommandReady = false;
 if (!argv.includes('--no-global-command')) {
   step('Registering the user-level mcp-dev-runtime command...');
   printCommandResult(await installCommand());
+  step('Checking whether the short mdr command is available...');
+  try {
+    const short = await installCommand({ name: 'mdr' });
+    printCommandResult(short, { pathHint: false });
+    shortCommandReady = true;
+  } catch (error) {
+    if (error?.code !== COMMAND_CONFLICT) throw error;
+    step(`Short command mdr was not registered: ${error.message}`);
+    step('Setup will continue normally; use mcp-dev-runtime instead.');
+  }
 }
 
 console.log('');
 console.log('MCP Dev Runtime setup complete.');
 console.log(`Project: ${ROOT}`);
-if (!argv.includes('--no-global-command')) console.log('From any directory: mcp-dev-runtime --help / status / doctor / down');
+if (!argv.includes('--no-global-command')) {
+  console.log(shortCommandReady
+    ? 'From any directory: mdr --help / status / doctor / down (mcp-dev-runtime remains available)'
+    : 'From any directory: mcp-dev-runtime --help / status / doctor / down');
+}
 if (localOnly) {
   console.log('Next: start local HTTP with "npm start -- --config config.json", or configure stdio in your MCP client.');
 } else {

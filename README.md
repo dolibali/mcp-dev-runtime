@@ -111,7 +111,7 @@ Development dependencies are needed for the build. The install path also prepare
 <a id="global-command"></a>
 ### Use the command from any directory
 
-After successful setup, a **user-level global command** is registered at `~/.local/bin/mcp-dev-runtime`. It uses the same checkout, Node executable, Tunnel cache and configuration; it does not copy a second runtime or require `sudo`. Keep the checkout and its Node installation in place.
+After successful setup, a **user-level global command** is registered at `~/.local/bin/mcp-dev-runtime`. Setup also tries to register the short `mdr` command automatically when that name is free. If `mdr` conflicts with another program, only the short alias is skipped and the installation still succeeds. Both entries use the same checkout, Node executable, Tunnel cache and configuration; they do not copy a second runtime or require `sudo`. Keep the checkout and its Node installation in place.
 
 For an already installed instance, register only the command without reinstalling dependencies, changing credentials or restarting services:
 
@@ -145,18 +145,24 @@ Add that line to the relevant shell startup file for future terminals; the insta
 Remove just this checkout's command with `npm run command:uninstall` from the repository. Configurations, Tunnel, history and running services remain untouched. Unregister before moving the checkout, then register from its new location; an old entry is not silently reassigned to a different source root. Advanced installations can use `npm run command:install -- --bin-dir /absolute/path/to/bin` and the same `--bin-dir` when uninstalling. Use `./install.sh --no-global-command` for CI or embedded installs that must not register a command.
 
 <a id="short-command"></a>
-#### Optional short command: `mdr`
+#### Short command: `mdr`
 
-`mdr` is convenient shorthand for **MCP Dev Runtime**, but it is not an exclusive command name: Markdown tools such as [CleverCloud/mdr](https://github.com/CleverCloud/mdr) and [michaelsanford/mdr](https://github.com/michaelsanford/mdr) already use it. The project/package name and default installed command therefore remain `mcp-dev-runtime`. No `mdr` alias is installed automatically.
+`mdr` is convenient shorthand for **MCP Dev Runtime**, but it is not an exclusive command name: Markdown tools such as [CleverCloud/mdr](https://github.com/CleverCloud/mdr) and [michaelsanford/mdr](https://github.com/michaelsanford/mdr) already use it. The project/package name and canonical command therefore remain `mcp-dev-runtime`.
 
-To opt in on a machine where that name is free, run these commands **from this repository**:
+During normal `./install.sh` / `npm run setup`, the installer checks `mdr` automatically. When the name is free, it registers both:
 
 ```bash
-type -a mdr || true
-npm run command:install -- --name mdr
+mcp-dev-runtime --version
+mdr --version
 ```
 
-Registration checks for an existing `mdr` executable throughout the current PATH, including later entries that a new wrapper could shadow, and refuses conflicts without executing, replacing or deleting the other command. It also refuses foreign files, directories and symlinks at the destination. Shell aliases/functions are not visible to a child installer: inspect `type -a mdr` in your own terminal first. The check describes the PATH at registration time; future installs or different shell environments can still introduce a conflict.
+If another `mdr` executable already exists anywhere on the current PATH, or an unrelated file/directory/symlink already occupies the destination, setup prints that the short command was skipped and continues with `mcp-dev-runtime`. It does not execute, overwrite or delete the other program. Shell aliases/functions are not visible to a child installer, so `type -a mdr` is still useful when diagnosing an unexpected shell-level conflict. The automatic check describes the PATH at installation time; future installs or different shell environments can still introduce a conflict.
+
+For an older installation, or after a conflicting command has legitimately gone away, retry only the short registration from this repository:
+
+```bash
+npm run command:install -- --name mdr
+```
 
 After successful registration and PATH setup, the short command uses the same installation and service as the long command:
 
@@ -170,7 +176,7 @@ mdr smoke
 
 All subcommands remain the same, including `mdr up --background` and `mdr down`; the existing credential configuration still applies. `mdr --version` identifies the project as `mcp-dev-runtime`, not a renamed package. Do **not** run `npm install -g mdr` to install this project; it installs an [unrelated Markdown reader](https://github.com/mrchimp/mdr).
 
-Remove only the short entry with `npm run command:uninstall -- --name mdr`. Removing the default long entry does not remove the short entry, or vice versa. Specify the same `--bin-dir` when using a custom directory. Neither removal stops services or deletes configuration, logs or history. Registration options: `npm run command:install -- --help`.
+Remove only the short entry with `npm run command:uninstall -- --name mdr`. Removing the long entry does not remove the short entry, or vice versa. Specify the same `--bin-dir` when using a custom directory. Neither removal stops services or deletes configuration, logs or history. Registration options: `npm run command:install -- --help`.
 
 <a id="npm-arguments"></a>
 **Why is there a separate `--`?** In `npm run doctor -- --json`, `npm run doctor` selects this project's diagnostic script, the standalone `--` tells npm to forward the following arguments, and `--json` is an option for that script. It is not a typo or an extra dash to remove. For normal interactive checks, simply use `npm run doctor`; add `-- --json` when you need the script's JSON output. The script invocation is `node scripts/doctor.mjs --json`; direct Node invocation does not need npm's separator. See the [official npm argument-passing reference](https://docs.npmjs.com/cli/v12/commands/npm-run/).

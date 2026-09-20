@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Add an opt-in `mdr` command via `command:install -- --name mdr`, retaining the canonical command and rejecting existing short-name executables anywhere on the current PATH. Command-only removal selects one name and never removes another tool.
+- Add the `mdr` convenience command while retaining `mcp-dev-runtime` as canonical. Normal setup auto-registers `mdr` only when conflict-free and otherwise skips just the short alias; explicit command-only registration remains strict. Command-only removal selects one name and never removes another tool.
 - Document diagnostic log locations, custom state directories, rotation-aware viewing, error searches with context, missing/empty log behavior and the distinction between service logs and captured execution history in both READMEs.
 - Register a user-level `mcp-dev-runtime` command during setup, with an opt-out and standalone command-only install/remove operations. Preserve unrelated commands and report missing PATH entries; do not edit shell profiles or duplicate services.
 - Add global `doctor` and configuration-aware `smoke` subcommands. Resolve explicit path arguments from the caller while keeping managed configuration and working-directory bases attached to the installation; preserve local `serve`/stdio caller-directory behavior.

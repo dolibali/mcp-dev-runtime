@@ -111,7 +111,7 @@ cd mcp-dev-runtime
 <a id="global-command"></a>
 ### 在任意目录使用全局命令
 
-安装成功后，会在 `~/.local/bin/mcp-dev-runtime` 注册**当前用户的全局命令**。它仍使用同一份源码、Node 程序、Tunnel 缓存和配置，不会复制第二套运行时，也不需要 `sudo`。注册后不要删除源码目录或对应 Node 安装。
+安装成功后，会在 `~/.local/bin/mcp-dev-runtime` 注册**当前用户的全局命令**。安装器还会自动尝试注册短命令 `mdr`；如果这个名字已被其他程序占用，只跳过短命令，不影响整个安装成功。两个入口都仍使用同一份源码、Node 程序、Tunnel 缓存和配置，不会复制第二套运行时，也不需要 `sudo`。注册后不要删除源码目录或对应 Node 安装。
 
 已经装好的实例，可以只注册命令，不必重装依赖、修改凭据或重启服务：
 
@@ -145,18 +145,24 @@ export PATH="$HOME/.local/bin:$PATH"
 只移除当前源码目录注册的命令，可在仓库中运行 `npm run command:uninstall`，不会删除配置、Tunnel、历史或停止服务。迁移源码目录前先移除入口，再从新位置注册；安装器不会默默把旧入口改指向另一份源码。高级安装可以指定 `npm run command:install -- --bin-dir /absolute/path/to/bin`，卸载时使用相同的 `--bin-dir`。CI 或嵌入式部署不需要全局入口时，用 `./install.sh --no-global-command` 跳过注册。
 
 <a id="short-command"></a>
-#### 可选短命令：`mdr`
+#### 短命令：`mdr`
 
-`mdr` 适合作为 **MCP Dev Runtime** 的日常缩写，但不是独占名称：[CleverCloud/mdr](https://github.com/CleverCloud/mdr)、[michaelsanford/mdr](https://github.com/michaelsanford/mdr) 等 Markdown 工具已在使用它。因此，项目名、包名和默认安装命令仍保留 `mcp-dev-runtime`，不会自动给所有用户注册 `mdr`。
+`mdr` 适合作为 **MCP Dev Runtime** 的日常缩写，但不是独占名称：[CleverCloud/mdr](https://github.com/CleverCloud/mdr)、[michaelsanford/mdr](https://github.com/michaelsanford/mdr) 等 Markdown 工具已在使用它。因此项目名、包名和正式命令仍保留 `mcp-dev-runtime`。
 
-确认自己的机器未使用同名命令后，可以**在本项目目录中**主动注册短入口：
+正常执行 `./install.sh` / `npm run setup` 时，安装器会自动检查 `mdr`。没有冲突时会同时注册：
 
 ```bash
-type -a mdr || true
-npm run command:install -- --name mdr
+mcp-dev-runtime --version
+mdr --version
 ```
 
-注册器会检查当前 PATH 中的全部 `mdr` 可执行文件，包括可能被新入口遮挡的后续目录；发现冲突就拒绝，不会执行、覆盖或删除对方命令。目标位置已有无关文件、目录或符号链接时也会拒绝。子进程看不到当前交互 Shell 的别名或函数，因此先在自己的终端检查 `type -a mdr`。此检查仅反映注册当时的 PATH，后续安装其他软件或切换 Shell 环境仍可能引入冲突。
+如果当前 PATH 任意位置已经有其他 `mdr` 可执行文件，或者目标位置已有无关文件、目录或符号链接，安装器会提示“已跳过短命令”，继续保留 `mcp-dev-runtime` 并完成安装；不会执行、覆盖或删除对方程序。子进程看不到当前交互 Shell 的别名或函数，因此遇到 Shell 层冲突时仍可运行 `type -a mdr` 排查。自动检测只代表安装当时的 PATH，未来安装其他软件或切换 Shell 环境仍可能产生新冲突。
+
+旧安装，或者原有冲突已经正常消失后，可以在项目目录单独重试短入口：
+
+```bash
+npm run command:install -- --name mdr
+```
 
 注册成功且命令目录已加入 PATH 后，短命令与长命令使用同一份安装和服务：
 
@@ -170,7 +176,7 @@ mdr smoke
 
 其他子命令也保持一致，例如 `mdr up --background` 和 `mdr down`；原有凭据配置仍然适用。`mdr --version` 会显示项目名 `mcp-dev-runtime`，不是重命名后的另一个包。**不要运行 `npm install -g mdr` 来安装本项目**，它安装的是[另一个 Markdown 阅读器](https://github.com/mrchimp/mdr)。
 
-只移除短入口时运行 `npm run command:uninstall -- --name mdr`。默认移除长入口不会连带删除短入口，反之亦然；自定义命令目录需传入相同的 `--bin-dir`。移除入口不会停止服务，也不会删除配置、日志或历史。注册选项可通过 `npm run command:install -- --help` 查看。
+只移除短入口时运行 `npm run command:uninstall -- --name mdr`。移除长入口不会连带删除短入口，反之亦然；自定义命令目录需传入相同的 `--bin-dir`。移除入口不会停止服务，也不会删除配置、日志或历史。注册选项可通过 `npm run command:install -- --help` 查看。
 
 <a id="npm-arguments"></a>
 **命令中间的 `--` 是什么意思？** 在 `npm run doctor -- --json` 中，`npm run doctor` 选择本项目的诊断脚本，单独的 `--` 告诉 npm 将后面的参数传给脚本，`--json` 才是脚本的输出选项。这不是笔误，也不是可以随意删除的多余横线。日常人工检查直接运行 `npm run doctor` 即可；需要脚本输出 JSON 时再加 `-- --json`。它调用的脚本是 `node scripts/doctor.mjs --json`；直接使用 Node 时不需要 npm 的分隔符。参考 [npm 官方参数传递说明](https://docs.npmjs.com/cli/v12/commands/npm-run/)。

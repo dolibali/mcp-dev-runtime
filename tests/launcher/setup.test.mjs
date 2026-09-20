@@ -68,7 +68,8 @@ test('setup: first full install builds pinned Tunnel path and creates private co
   const first = await f.run();
   assert.match(first.stdout, /setup complete/i);
   assert.equal((await stat(path.join(f.home, '.local/bin/mcp-dev-runtime'))).mode & 0o777, 0o755);
-  await assert.rejects(stat(path.join(f.home, '.local/bin/mdr')), { code: 'ENOENT' });
+  assert.equal((await stat(path.join(f.home, '.local/bin/mdr'))).mode & 0o777, 0o755);
+  assert.match(first.stdout, /Global command created: .*\/mdr/);
   assert.equal(await readFile(path.join(f.root, 'config.json'), 'utf8'), await readFile(path.join(f.root, 'config.example.json'), 'utf8'));
   assert.equal(await readFile(path.join(f.root, 'launcher.config.json'), 'utf8'), await readFile(path.join(f.root, 'launcher.config.example.json'), 'utf8'));
   assert.equal((await stat(path.join(f.root, 'runtime.env'))).mode & 0o777, 0o600);
@@ -90,6 +91,33 @@ test('setup: first full install builds pinned Tunnel path and creates private co
   calls = (await readFile(f.log, 'utf8')).trim().split('\n');
   assert.equal(calls.filter(x => x === 'ci --include=dev').length, 1);
   assert.equal(calls.filter(x => x === 'run tunnel:setup -- --build').length, 1);
+});
+
+test('setup: an existing mdr command is preserved and only the short alias is skipped', async t => {
+  const f = await fixture(t, { tools: [] });
+  const marker = path.join(f.root, 'foreign-mdr-ran');
+  const foreign = path.join(f.bin, 'mdr');
+  await executable(foreign, `#!${process.execPath}\nrequire('node:fs').writeFileSync(${JSON.stringify(marker)},'ran');\n`);
+  const before = await readFile(foreign, 'utf8');
+  const result = await f.run(['--local-only']);
+  assert.match(result.stdout, /Short command mdr was not registered/);
+  assert.match(result.stdout, /use mcp-dev-runtime instead/);
+  assert.equal(await readFile(foreign, 'utf8'), before);
+  await assert.rejects(stat(marker), { code: 'ENOENT' });
+  assert((await stat(path.join(f.home, '.local/bin/mcp-dev-runtime'))).isFile());
+  await assert.rejects(stat(path.join(f.home, '.local/bin/mdr')), { code: 'ENOENT' });
+});
+
+test('setup: a foreign mdr file at the destination is preserved and does not fail installation', async t => {
+  const f = await fixture(t, { tools: [] });
+  const destination = path.join(f.home, '.local', 'bin');
+  await mkdir(destination, { recursive: true });
+  const foreign = path.join(destination, 'mdr');
+  await writeFile(foreign, 'foreign mdr\n', { mode: 0o644 });
+  const result = await f.run(['--local-only']);
+  assert.match(result.stdout, /Short command mdr was not registered/);
+  assert.equal(await readFile(foreign, 'utf8'), 'foreign mdr\n');
+  assert((await stat(path.join(destination, 'mcp-dev-runtime'))).isFile());
 });
 
 test('setup: embedded mode leaves the user global command directory untouched', async t => {

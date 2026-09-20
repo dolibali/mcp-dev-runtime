@@ -12,7 +12,13 @@ import { randomUUID } from 'node:crypto';
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const NAME = 'mcp-dev-runtime';
 const SHORT_NAME = 'mdr';
+export const COMMAND_CONFLICT = 'COMMAND_CONFLICT';
 const quote = text => "'" + text.replaceAll("'", "'\\''") + "'";
+function commandConflict(message) {
+  const error = new Error(message);
+  error.code = COMMAND_CONFLICT;
+  return error;
+}
 const absent = async file => {
   try { return await lstat(file); }
   catch (error) { if (error.code === 'ENOENT') return null; throw error; }
@@ -35,7 +41,7 @@ async function ownedCommand(destination, header) {
   const info = await absent(destination);
   if (!info) return null;
   if (!info.isFile() || info.isSymbolicLink() || info.uid !== process.getuid()) {
-    throw new Error(`Refusing to replace or remove an unrelated command: ${destination}`);
+    throw commandConflict(`Refusing to replace or remove an unrelated command: ${destination}`);
   }
   const handle = await open(destination, constants.O_RDONLY | constants.O_NOFOLLOW);
   try {
@@ -45,7 +51,7 @@ async function ownedCommand(destination, header) {
     }
     const text = await handle.readFile('utf8');
     if (!text.startsWith(header)) {
-      throw new Error(`Command already belongs to another installation or program: ${destination}. No file was overwritten.`);
+      throw commandConflict(`Command already belongs to another installation or program: ${destination}. No file was overwritten.`);
     }
     return { info: current, text };
   } finally { await handle.close(); }
@@ -78,7 +84,7 @@ async function refuseShortNameConflict({ name, destination }) {
   for (const dir of new Set((process.env.PATH ?? '').split(path.delimiter))) {
     const candidate = path.resolve(dir || '.', name);
     if (await executableFile(candidate) && await realpath(candidate) !== ownPath) {
-      throw new Error(`Short command mdr conflicts with an existing executable: ${candidate}. No command was installed. Keep using mcp-dev-runtime; do not remove the other program to force this alias.`);
+      throw commandConflict(`Short command mdr conflicts with an existing executable: ${candidate}. No command was installed. Keep using mcp-dev-runtime; do not remove the other program to force this alias.`);
     }
   }
 }
@@ -154,9 +160,9 @@ export async function removeCommand({ root = ROOT, binDir = path.join(homedir(),
   return { status: 'removed', path: p.destination };
 }
 
-export function printCommandResult(result) {
+export function printCommandResult(result, { pathHint = true } = {}) {
   console.log(`Global command ${result.status}: ${result.path}`);
-  if (result.in_path === false) {
+  if (pathHint && result.in_path === false) {
     console.log('Add this directory to PATH for your terminal (shell profiles are not edited automatically):');
     console.log('export PATH=' + quote(path.dirname(result.path)) + ':"$PATH"');
     console.log('Put that export in your shell profile for future terminals, or use the full command path now.');
