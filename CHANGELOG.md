@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `--bg` as a shorthand alias for `mdr up --background`; both forms use the same background-launch path.
+
 ## 1.0.1 — 2026-09-20
 
 - Add a single interactive `uninstall.sh` for complete removal. It requires an explicit `y`, safely stops the owned managed instance, removes owned commands, program versions, configuration/credentials, state/history, logs and cache, and never deletes a source Git checkout itself.

@@ -18,7 +18,7 @@ const help=`${NAME} ${VERSION}
 Commands:
   init                                Create missing user configuration (binary distribution)
   serve [--transport http|stdio ...]   Run the MCP server without Tunnel
-  up [--background]                   Start managed MCP and Tunnel when enabled
+  up [--background|--bg]              Start managed MCP and Tunnel when enabled
   status [--verbose|--json]           Show the managed instance
   down                                Stop only the managed instance
   doctor [--json] [--offline]          Diagnose the installed runtime and selected configuration
@@ -133,7 +133,9 @@ async function main(){
   if(originalArgs.includes('--help')||originalArgs.includes('-h')){console.log(help);return;}
   // Resolve user-provided paths before switching the management cwd. The MCP
   // child already starts from ROOT; doctor and history-clear must use that same base.
-  const args = absolutePathArgs(originalArgs);
+  // --bg is a convenience alias only; normalize it before parsing so the
+  // launcher keeps one background-mode implementation and one child-spawn path.
+  const args = absolutePathArgs(originalArgs.map(arg => arg === '--bg' ? '--background' : arg));
   process.chdir(layout().working_dir);
   if(command==='init'){
     parseArgs({args,options:{}});

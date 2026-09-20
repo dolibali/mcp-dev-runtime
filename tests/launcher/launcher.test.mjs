@@ -89,7 +89,7 @@ test('launcher: dotenv credentials are data rather than executable shell code',a
  assert.equal((await current(f.stateDir)).state,'ready');await assert.rejects(stat(path.join(f.dir,'should-not-exist')));
 });
 test('launcher: background startup, repeat startup, status and owned shutdown',async t=>{
- const f=await fixture(t);const first=JSON.parse((await f.call('up',['--background'])).stdout);assert.equal(first.state,'ready');
+ const f=await fixture(t);const first=JSON.parse((await f.call('up',['--bg'])).stdout);assert.equal(first.state,'ready');
  assert.equal(first.health.availability,'ready');assert.equal(first.health.mcp.ok,true);assert.equal(first.health.tunnel.ok,true);
  const second=JSON.parse((await f.call('up',['--background'])).stdout);assert.equal(second.already_running,true);assert.equal(second.run_id,first.run_id);
  const health=await (await fetch(`http://127.0.0.1:${f.mp}/healthz`)).json();assert.equal(health.server,'mcp-dev-runtime');assert.equal(health.version,VERSION);
