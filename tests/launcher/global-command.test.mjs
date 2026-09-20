@@ -261,6 +261,7 @@ test('global CLI: default config, doctor, smoke, repeat up and down address one 
   assert.match(concise, /MCP\s+ready\s+http:\/\/127\.0\.0\.1:/);
   assert.match(concise, /Tunnel\s+ready/);
   assert.match(concise, /Sessions\s+0 \/ 8 active/);
+  assert.match(concise, /Uptime\s+(?:\d+d )?(?:\d+h )?(?:\d+m )?\d+s/);
   assert(concise.includes(f.state));
   assert(!concise.includes('tunnel_sha256'));
   const verbose = (await shortRun(['status', '--verbose'])).stdout;
@@ -274,6 +275,13 @@ test('global CLI: default config, doctor, smoke, repeat up and down address one 
   await assert.rejects(shortRun(['status', '--verbose', '--json']), /either --verbose or --json/);
   const shortDoctor = JSON.parse((await shortRun(['doctor', '--json'])).stdout);
   assert.equal(shortDoctor.ok, true); assert.equal(shortDoctor.supervisor.run_id, first.run_id);
+  const paths = JSON.parse((await shortRun(['paths', '--json'])).stdout);
+  assert.equal(paths.package_root, f.root + path.sep);
+  assert.equal(paths.launcher_config, path.join(f.root, 'launcher.config.json'));
+  assert.equal(paths.runtime_config, path.join(f.root, 'config.json'));
+  assert.equal(paths.state_dir, f.state);
+  assert.equal(paths.logs_dir, f.state);
+  assert(!('npm_user_defaults' in paths));
   assert.match((await shortRun(['smoke'])).stdout, /LOCAL MCP SMOKE PASSED/);
   const again = JSON.parse((await f.run(['up', '--background'], f.dir)).stdout);
   assert.equal(again.run_id, first.run_id); assert.equal(again.already_running, true);

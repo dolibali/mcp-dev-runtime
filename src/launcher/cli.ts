@@ -19,6 +19,7 @@ Commands:
   down                                Stop only the managed instance
   doctor [--json] [--offline]          Diagnose the installed runtime and selected configuration
   smoke [URL]                         Discover tools and run one harmless command
+  paths [--json]                      Show resolved paths used by this installation
   tunnel-setup [--build]               Check an installed binary or build pinned runtime
   versions                            Show project/tool-contract/Tunnel version pair
   history-clear --confirm              Clear this config's disk history while its writer is stopped
@@ -63,11 +64,11 @@ async function runScript(name: string, args: string[]) {
 type StatusRecord = Record<string, any>;
 function duration(seconds: unknown): string {
   if(typeof seconds!=='number'||!Number.isFinite(seconds)||seconds<0)return 'unknown';
-  const whole=Math.floor(seconds),days=Math.floor(whole/86400),hours=Math.floor((whole%86400)/3600),minutes=Math.floor((whole%3600)/60);
-  if(days)return days+'d '+hours+'h';
-  if(hours)return hours+'h '+minutes+'m';
-  if(minutes)return minutes+'m '+(whole%60)+'s';
-  return whole+'s';
+  const whole=Math.floor(seconds),days=Math.floor(whole/86400),hours=Math.floor((whole%86400)/3600),minutes=Math.floor((whole%3600)/60),secs=whole%60;
+  if(days)return days+'d '+hours+'h '+minutes+'m '+secs+'s';
+  if(hours)return hours+'h '+minutes+'m '+secs+'s';
+  if(minutes)return minutes+'m '+secs+'s';
+  return secs+'s';
 }
 function bytes(value: unknown): string {
   if(typeof value!=='number'||!Number.isFinite(value)||value<0)return 'unknown';
@@ -142,6 +143,33 @@ async function main(){
       url=`http://${c.host.includes(':')?'['+c.host+']':c.host}:${c.port}${c.mcp_path}`;
     }
     await runScript('smoke.mjs',[url]);return;
+  }
+  if(command==='paths'){
+    const {values}=parseArgs({args,options:{
+      'launcher-config':{type:'string'},'state-dir':{type:'string'},json:{type:'boolean'}
+    }});
+    const overrides:Record<string,unknown>={};
+    if(values['state-dir']!==undefined)overrides.state_dir=path.resolve(values['state-dir']);
+    const launcherFile=path.resolve(values['launcher-config']??path.join(ROOT,'launcher.config.json'));
+    const o=await options(values['launcher-config'],overrides);
+    const result={
+      package_root:ROOT,
+      launcher_config:launcherFile,
+      runtime_config:o.runtime_config??null,
+      state_dir:o.state_dir,
+      logs_dir:o.state_dir
+    };
+    if(values.json){console.log(JSON.stringify(result,null,2));return;}
+    console.log([
+      NAME+' '+VERSION,
+      '',
+      row('Package',result.package_root),
+      row('Launcher',result.launcher_config),
+      row('Runtime cfg',result.runtime_config??'none'),
+      row('State',result.state_dir),
+      row('Logs',result.logs_dir)
+    ].join('\n'));
+    return;
   }
   if(command==='status'){
     const {values}=parseArgs({args,options:{

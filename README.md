@@ -136,9 +136,12 @@ Status has three output levels:
 mdr status
 mdr status --verbose
 mdr status --json
+mdr paths
 ```
 
 Plain `status` is a short human-readable summary for daily checks. `--verbose` adds process IDs, instance IDs, latency, memory, retained-session/history sizes and Tunnel version. `--json` preserves the complete machine-readable supervisor object for scripts and deep troubleshooting. The long `mcp-dev-runtime` command supports the same flags; from npm use `npm run status -- --json` or `npm run status -- --verbose`.
+
+`mdr paths` shows only the paths actually resolved for the current installation. It does not preview hypothetical future locations or migrate anything. If a later npm/global distribution uses different user directories, the same command will report those effective paths. Use `mdr paths --json` for machine-readable output.
 
 For startup without typing the credentials path each time, merge `"env_file": "runtime.env"` into the **existing** `launcher.config.json` (do not replace the other settings). The value is a filename, not the API key. You can then use `mcp-dev-runtime up --background` and `mcp-dev-runtime down` from any directory. With explicit `--env-file FILE`, a relative FILE is resolved from the terminal's current directory; use an absolute path when appropriate. Registration itself never reads or changes `runtime.env` and never starts or stops a service.
 
@@ -495,6 +498,8 @@ grep -nEi -C 3 'error|failed|failure|exception|panic|timeout|timed out|ECONN|EAD
 Keyword matching is not an error classifier: no match is not proof of health, and `grep` normally exits with status 1 when nothing matches. A matching word is not automatically a service outage either. Preserve the surrounding context, compare timestamps with the failing operation, and check the current `doctor` result. Use the real state-directory paths below instead of `.runtime/` when customized. Avoid sharing raw `runtime.env` or complete private logs; review/redact paths, command content, Tunnel IDs and secrets first.
 
 **Custom directory:** `state_dir` in the selected `launcher.config.json` controls these paths. Relative JSON paths resolve from that configuration file, while a CLI `--state-dir` resolves from the caller. Use the same configuration/override for `up`, `status` and `down`. Plain `mcp-dev-runtime status` / `mdr status` shows the resolved log directory; `status --json` includes the absolute MCP/Tunnel filenames in `logs[].file`. Read those paths instead of assuming a custom installation still uses `.runtime/`.
+
+For the current source-checkout installation, `.runtime/` is intentionally colocated with the project. A future npm/global distribution should keep mutable data outside the installed package tree, but `mdr paths` will continue to show only whichever locations are actually in use at that time.
 
 **Service logs are not command-output history.** When a build, test or shell command fails, inspect its returned `output` and actual `exit_code`, and continue that session with `write_stdin` if necessary. Disk execution history separately defaults to `.mcp-dev-runtime/history/` under the runtime's configured `cwd`; `history.directory` in the runtime configuration can move it elsewhere, for example `.runtime/history/`. Raw tool stdout/stderr is not saved there by default: enable `capture_output: true` when starting a task to preserve its bounded archive. Query it through the [history tools](#history), not by expecting every build's output in `mcp.log`.
 

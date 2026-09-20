@@ -136,9 +136,12 @@ mcp-dev-runtime smoke
 mdr status
 mdr status --verbose
 mdr status --json
+mdr paths
 ```
 
 普通 `status` 是日常查看用的简洁摘要；`--verbose` 会补充进程 PID、实例 ID、延迟、内存、保留会话 / 历史大小以及 Tunnel 版本；`--json` 保留完整的机器可读 supervisor 对象，适合脚本和深度排障。长命令 `mcp-dev-runtime` 支持同样参数；通过 npm 使用时写成 `npm run status -- --json` 或 `npm run status -- --verbose`。
+
+`mdr paths` 只显示当前这份安装真正解析并使用的路径，不预览假设中的未来目录，也不会迁移任何文件。以后 npm / 全局发行版如果改用用户目录，同一个命令会自然显示当时实际生效的路径。需要机器可读结果时用 `mdr paths --json`。
 
 为了每次启动不用重新填写凭据文件路径，把 `"env_file": "runtime.env"` 合并到**已有的** `launcher.config.json` 中，保留其他设置；这个值是文件名，不是 API Key。之后在任意目录都可以运行 `mcp-dev-runtime up --background` 和 `mcp-dev-runtime down`。显式传入 `--env-file FILE` 时，相对路径按终端当前目录解析，必要时使用绝对路径。注册命令本身不读取或修改 `runtime.env`，也不启动或停止服务。
 
@@ -503,6 +506,8 @@ grep -nEi -C 3 'error|failed|failure|exception|panic|timeout|timed out|ECONN|EAD
 关键词搜索不是错误判定器：没有命中不代表服务健康，`grep` 没有匹配时正常返回退出码 1；命中一个词也不一定代表服务不可用。保留前后上下文，对照出错操作的时间和当前 `doctor` 结果。改过状态目录时，使用下面说明的实际路径，不要继续照抄 `.runtime/`。不要直接分享 `runtime.env` 或完整私人日志，先检查并脱敏路径、命令内容、Tunnel ID 和秘密值。
 
 **改过目录时：**所选 `launcher.config.json` 的 `state_dir` 决定这些日志的路径。JSON 中的相对路径以该配置文件为基准，命令行 `--state-dir` 的相对路径以调用目录为基准。`up`、`status`、`down` 要使用相同的配置或覆盖项。普通 `mcp-dev-runtime status` / `mdr status` 会显示解析后的日志目录；`status --json` 会在 `logs[].file` 中给出 MCP / Tunnel 日志的绝对路径。自定义安装应以这些实际路径为准，不能继续假定是 `.runtime/`。
+
+当前源码 checkout 有意把 `.runtime/` 放在项目目录中。未来通过 npm / 全局安装时，不应把可变状态写入安装包或 `node_modules`；到那时 `mdr paths` 仍只显示实际生效的目录，不需要改变命令语义。
 
 **服务日志不等于命令输出历史。**构建、测试或 Shell 命令失败时，应查看工具返回的 `output` 和真实 `exit_code`，必要时用 `write_stdin` 继续读取该会话。磁盘执行历史默认在运行时配置的 `cwd` 下的 `.mcp-dev-runtime/history/`；运行时配置中的 `history.directory` 可以将其改到其他位置，例如 `.runtime/history/`。默认不保存工具的原始 stdout/stderr，需要保留某次构建日志时，在启动任务时设置 `capture_output: true`，再通过[历史工具](#history)查询有容量上限的档案，而不是到 `mcp.log` 中找每一条构建输出。
 

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add `paths [--json]` to show only the package/config/state/log paths actually resolved for the current installation, keeping the command compatible with future distribution layouts.
 - Make `status` concise and human-readable by default, add `status --verbose` for operational detail, and preserve the previous complete object behind `status --json`.
 - Add the `mdr` convenience command while retaining `mcp-dev-runtime` as canonical. Normal setup auto-registers `mdr` only when conflict-free and otherwise skips just the short alias; explicit command-only registration remains strict. Command-only removal selects one name and never removes another tool.
 - Document diagnostic log locations, custom state directories, rotation-aware viewing, error searches with context, missing/empty log behavior and the distinction between service logs and captured execution history in both READMEs.

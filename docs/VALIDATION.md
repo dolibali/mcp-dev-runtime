@@ -1,5 +1,9 @@
 # 0.3.0 local validation record
 
+## Resolved path reporting — 2026-09-20
+
+The local checkout now exposes `mdr paths` / `mdr paths --json` without changing the active service or moving existing files. It reports only paths actually resolved by the selected installation/configuration: package root, launcher config, runtime config, state directory and log directory. Regression coverage verifies those values through the registered short command and confirms that no hypothetical future-path object is emitted.
+
 ## Status output modes — 2026-09-20
 
 The launcher CLI now defaults to a concise human-readable `status` view, with `--verbose` for operational detail and `--json` preserving the previous complete supervisor object. The registered `mdr` entry was exercised against the existing managed macOS instance from outside the repository: concise output reported ready MCP/Tunnel state, session/history counts, uptime and the resolved log directory; verbose output added process IDs, instance IDs, latencies, memory, retained output, history size and Tunnel version; JSON retained `run_id`, component PIDs and log objects. No service restart was required because the wrapper resolves the rebuilt CLI entrypoint.

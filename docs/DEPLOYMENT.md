@@ -115,6 +115,8 @@ When a proxy is required, preserve loopback exclusions with `NO_PROXY=localhost,
 
 For the file-by-file directory table and `tail -F` examples, see [README log instructions](../README.md#logs) / [中文日志目录与查看方法](README.zh-CN.md#logs). On a reachable managed instance, plain `mcp-dev-runtime status` / `mdr status` shows the log directory; `status --json` exposes absolute service log paths in `logs[].file`.
 
+`mdr paths` reports only the package/config/state/log locations actually resolved for the current installation. Source-checkout installations therefore show their configured `.runtime` directory. A future npm/global installation can resolve different user-scoped locations without changing this command's semantics.
+
 The default `.runtime/` directory contains supervisor state, locks, a private control socket, Tunnel build caches and diagnostic logs. Disk execution history instead defaults to `.mcp-dev-runtime/history` relative to runtime `cwd`; configuring `.runtime/history` is an explicit deployment choice, not an automatic relocation.
 
 Command previews and raw output are not persisted by default; labels and workdirs still carry private metadata. Use `capture_output=true` on important tasks whose raw output should be archived. Time-based memory eviction is disabled by default, but memory and disk quotas remain. History is single-writer and read-only after recovery; it cannot resume old processes. See [HISTORY_AND_RECOVERY.md](HISTORY_AND_RECOVERY.md).
