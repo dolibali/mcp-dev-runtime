@@ -12,13 +12,15 @@ import { RetryCache } from '../../dist/runtime/retry-cache.js';
 import { startHttp } from '../../dist/mcp/http.js';
 import { fixture, nodeCmd } from '../helpers.mjs';
 import { contracts, assertOutput } from '../output-contract-helper.mjs';
+import { defaultToolAllowlist } from '../../dist/mcp/tool-registry.js';
 async function setup(t) {
   const config=await fixture(t),runtime=new Runtime(config),http=await startHttp(runtime);
   t.after(()=>http.close());
   const c=new Client({name:'output-schema-test',version:'1.0.0'});t.after(()=>c.close());
   await c.connect(new StreamableHTTPClientTransport(new URL(http.url)));
   const names=(await c.listTools()).tools;
-  for(const expected of contracts)assert.deepEqual(names.find(x=>x.name===expected.name)?.outputSchema,expected.outputSchema);
+  assert.deepEqual(names.map(tool=>tool.name),defaultToolAllowlist);
+  for(const expected of contracts.filter(tool=>defaultToolAllowlist.includes(tool.name)))assert.deepEqual(names.find(x=>x.name===expected.name)?.outputSchema,expected.outputSchema);
   return {config,runtime,http,c,call:async(name,args={})=>assertOutput(name,await c.callTool({name,arguments:args}))};
 }
 test('output contract HTTP: all six real tools validate against the advertised schemas',async t=>{

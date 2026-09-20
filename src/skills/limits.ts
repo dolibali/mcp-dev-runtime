@@ -1,0 +1,25 @@
+// Deliberately bounded, internal defaults; no per-call unbounded size knobs.
+export const limits = Object.freeze({
+  catalogTtlMs: 30_000,
+  bodyTtlMs: 600_000,
+  metadataBytes: 16 * 1024,
+  fileBytes: 256 * 1024,
+  discoveryBytes: 4096,
+  readBytes: 24 * 1024,
+  scanDepth: 8,
+  directoriesPerRoot: 2048,
+  entriesPerRoot: 10_000,
+  skillsPerRoot: 512,
+  skillsPerCatalog: 1024,
+  rootsPerCatalog: 128,
+  ancestors: 64,
+  scanDeadlineMs: 5000,
+  requestDeadlineMs: 15_000,
+  rootCacheBytes: 12 * 1024 * 1024,
+  scopeCacheBytes: 8 * 1024 * 1024,
+  bodyCacheBytes: 8 * 1024 * 1024,
+  rootCacheEntries: 64,
+  scopeCacheEntries: 16,
+  bodyCacheEntries: 32,
+  warnings: 8
+});

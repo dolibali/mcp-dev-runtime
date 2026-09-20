@@ -8,6 +8,7 @@ import { PatchEngine } from '../../dist/runtime/patch-engine.js';
 import { RetryCache } from '../../dist/runtime/retry-cache.js';
 import { fixture, nodeCmd } from '../helpers.mjs';
 import { contracts, validators, assertOutput, assertInvalid } from '../output-contract-helper.mjs';
+import { defaultToolAllowlist, toolPolicies } from '../../dist/mcp/tool-registry.js';
 async function setup(t, overrides = {}) {
   const config = await fixture(t, overrides), runtime = new Runtime(config);
   t.after(async () => assert.deepEqual((await runtime.close()).remaining, []));
@@ -21,8 +22,10 @@ async function drain(call, first) {
   }
   return {...last, output:text};
 }
-test('output schema: six object contracts reject empty and malformed error results', async () => {
-  assert.equal(contracts.length, 6);
+test('output schema: six stable and two experimental object contracts reject malformed results', async () => {
+  assert.equal(defaultToolAllowlist.length, 6);
+  assert.equal(contracts.length, 8);
+  assert.deepEqual(contracts.map(t=>t.name),toolPolicies.map(t=>t.name));
   for (const tool of contracts) {
     assert.equal(tool.outputSchema.type, 'object');
     assert.equal(tool.outputSchema.additionalProperties, false);

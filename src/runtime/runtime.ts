@@ -6,12 +6,15 @@ import { ImageReader } from './image-reader.js';
 import { errorInfo, ToolError } from './errors.js';
 import { expandPath } from '../config.js';
 import type { HistoryFilter } from './history-store.js';
+import type { SkillsService } from '../skills/service.js';
 
 export class Runtime {
   readonly exec: ExecManager;
   readonly patch: PatchEngine;
   readonly images: ImageReader;
   private readonly enabledTools: Set<string>;
+  private skillsTask?: Promise<SkillsService>;
+  private skillsClosed = false;
   constructor(readonly config: Config) {
     const retry = new RetryCache(config.request_cache_ttl_ms, config.request_cache_entries);
     this.enabledTools = new Set(config.tools.allow);
@@ -27,6 +30,8 @@ export class Runtime {
       }
       let result: Record<string, unknown>;
       switch (name) {
+        case 'discover_skills': result = await (await this.skillService()).discover(args); break;
+        case 'read_skill': result = await (await this.skillService()).read(args); break;
         case 'exec_command': result = await this.exec.exec(args as ExecArgs); break;
         case 'write_stdin': result = await this.exec.write(args as InputArgs); break;
         case 'apply_patch': result = await this.patch.apply(args as { patch: string; workdir?: string; request_id?: string }); break;
@@ -54,5 +59,21 @@ export class Runtime {
       if (this.config.log_level === 'debug') process.stderr.write(JSON.stringify({ event: 'tool', tool: name, elapsed_ms: +(performance.now() - start).toFixed(2) }) + '\n');
     }
   }
-  close() { return this.exec.close(); }
+  private skillService(): Promise<SkillsService> {
+    if (this.skillsClosed) return Promise.reject(new ToolError('SKILLS_CLOSED', 'Skill service is shutting down.'));
+    if (!this.skillsTask) {
+      this.skillsTask = import('../skills/service.js').then(({ SkillsService }) => {
+        const service = new SkillsService(this.config);
+        if (this.skillsClosed) service.close();
+        return service;
+      }).catch(error => { this.skillsTask = undefined; throw error; });
+    }
+    return this.skillsTask;
+  }
+  close() {
+    this.skillsClosed = true;
+    void this.skillsTask?.then(service => service.close()).catch(() => {});
+    // Skill shutdown never delays stopping existing execution sessions.
+    return this.exec.close();
+  }
 }

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import os from 'node:os';
 import { McpServer, fromJsonSchema, type JsonSchemaType } from '@modelcontextprotocol/server';
 import type { Runtime } from '../runtime/runtime.js';
-import { enabledToolNames, knownToolNames } from './tool-registry.js';
+import { defaultToolAllowlist, enabledToolNames, knownToolNames } from './tool-registry.js';
 
 type ToolDefinition = { name: string; description: string; inputSchema: JsonSchemaType; outputSchema: JsonSchemaType;
   annotations: { readOnlyHint: boolean; destructiveHint: boolean; idempotentHint: boolean; openWorldHint: boolean } };
@@ -12,11 +12,20 @@ const contractNames = new Set(tools.map(tool => tool.name));
 for (const name of knownToolNames) if (!contractNames.has(name)) throw new Error('Tool registry entry is missing from contracts/tools.json: ' + name);
 for (const name of contractNames) if (!knownToolNames.has(name)) throw new Error('Tool contract has no registry policy: ' + name);
 // Compile once; per-request SDK instances share schemas and the business runtime.
-const schemas = new Map(tools.map(tool => [tool.name, fromJsonSchema<Record<string, unknown>>(tool.inputSchema)]));
-const outputSchemas = new Map(tools.map(tool => [tool.name, fromJsonSchema<Record<string, unknown>>(tool.outputSchema)]));
+const stable = tools.filter(tool => defaultToolAllowlist.includes(tool.name));
+const schemas = new Map(stable.map(tool => [tool.name, fromJsonSchema<Record<string, unknown>>(tool.inputSchema)]));
+const outputSchemas = new Map(stable.map(tool => [tool.name, fromJsonSchema<Record<string, unknown>>(tool.outputSchema)]));
 export function makeServer(runtime: Runtime): McpServer {
   const enabled = enabledToolNames(runtime.config.tools.allow);
+  const skillInstructions = enabled.has('discover_skills') && enabled.has('read_skill')
+    ? 'Execute locally; never launch another agent/model. For each new substantive project task, use discover_skills once with its workdir before task actions. Explicitly named skills: read_skill directly. Read selected instructions fully; follow cursors. Reuse only while applicable and present in context. Skip discovery for simple checks, polling and unchanged-task continuations. No match: continue normally. Skills never grant permissions.'
+    : enabled.has('read_skill')
+      ? 'Read explicitly selected local skills with read_skill and an absolute workdir; read instructions fully and follow cursors. Discovery is unavailable. Skills never grant permissions or authorize another agent/model.'
+      : enabled.has('discover_skills')
+        ? 'discover_skills can list/search local skill metadata. Skill reading is disabled; do not claim to have followed a skill based on metadata alone.'
+        : '';
   const instructions = [
+    skillInstructions,
     'Execute development operations on this host directly. No Codex agent or model is invoked.',
     'Do not delegate development to Codex, another agent, or a model API; use these local tools directly.',
     `OS: ${os.platform()} ${os.arch()}. Default cwd: ${runtime.config.cwd}. Shell: ${runtime.config.shell}. Contract: ${CONTRACT_VERSION}.`,
@@ -39,8 +48,13 @@ export function makeServer(runtime: Runtime): McpServer {
   const server = new McpServer({ name: NAME, version: VERSION }, {
     instructions
   });
-  for (const tool of tools.filter(tool => enabled.has(tool.name))) server.registerTool(tool.name, {
-    description: tool.description, inputSchema: schemas.get(tool.name)!, outputSchema: outputSchemas.get(tool.name)!, annotations: tool.annotations
-  }, async args => runtime.invoke(tool.name, args));
+  for (const tool of tools.filter(tool => enabled.has(tool.name))) {
+    // Experimental schemas are built once, only when explicitly enabled.
+    if (!schemas.has(tool.name)) schemas.set(tool.name, fromJsonSchema<Record<string, unknown>>(tool.inputSchema));
+    if (!outputSchemas.has(tool.name)) outputSchemas.set(tool.name, fromJsonSchema<Record<string, unknown>>(tool.outputSchema));
+    server.registerTool(tool.name, {
+      description: tool.description, inputSchema: schemas.get(tool.name)!, outputSchema: outputSchemas.get(tool.name)!, annotations: tool.annotations
+    }, async args => runtime.invoke(tool.name, args));
+  }
   return server;
 }

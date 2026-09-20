@@ -1,10 +1,12 @@
 # MCP Dev Runtime tool reference
 
-Project 1.0.1 keeps the six default stable tool names and contract 3.1 behavior, with optional history, filtering and log-query arguments. Launcher commands are CLI operations, not additional MCP tools.
+Project 1.1.0 keeps the six default stable tool names and contract 3.1 behavior, with optional history, filtering and log-query arguments. Launcher commands are CLI operations, not additional MCP tools.
 
 # 工具接口参考
 
 接口名称和输入约束来自 contracts/tools.json。所有路径支持绝对路径；相对路径以显式 workdir 或固定服务 cwd 解析。本文不增加未实现的工具。
+
+Two optional experimental tools are available in v1.1.0: `discover_skills` and `read_skill`. They remain disabled by default and do not change the six stable tool contracts. See [Local Skills](SKILLS.md) / [中文说明](SKILLS.zh-CN.md).
 
 ## exec_command
 

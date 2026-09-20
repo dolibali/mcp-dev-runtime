@@ -213,6 +213,7 @@ async function main(){
       mcp:{transport:c.transport,host:c.host,port:c.port,path:c.mcp_path,health_path:c.health_path},
       tunnel:{enabled:o.tunnel_enabled,health_port:o.tunnel_health_port,ready_timeout_ms:o.ready_timeout_ms,health_interval_ms:o.health_interval_ms},
       tools:{allow:c.tools.allow},
+      skills:c.skills,
       runtime:{cwd:c.cwd,shell:c.shell,state_dir:o.state_dir,logs_dir:o.logs_dir??o.state_dir,env_file:o.env_file??null,shell_env:o.shell_env},
       logging:{level:c.log_level,max_bytes:o.log_max_bytes,files:o.log_files}
     };

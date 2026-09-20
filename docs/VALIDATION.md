@@ -1,5 +1,72 @@
 # Validation record
 
+## Experimental local Skills — unreleased implementation checkpoint
+
+The implementation was developed against baseline `2872675e020217e5a3c900b03313dbae2f4e8629`
+without restarting the maintainer's active MCP/Tunnel, changing its configuration,
+enabling experimental tools, committing, pushing or publishing. All Skill fixtures
+use temporary homes and workspaces; no private user Skill scripts were executed.
+
+The baseline passed **207 tests** (106 unit, 33 protocol, 68 launcher). The final
+source regression passed **249 tests** (140 unit, 41 protocol, 68 launcher), with
+zero failures/skips. The **42 new Skill-specific tests** cover global/project/worktree
+roots, canonical aliases, duplicate names, disabled paths, malformed YAML and
+sidecars, explicit-only invocation, dependencies as data, safe resource paths,
+binary/oversized/FIFO rejection, BOM/CRLF/UTF-8 preservation, changed/deleted files,
+signed scope-bound pagination, expiry/eviction, cache sharing, query matching,
+concurrency limits, legacy/unified config, actual HTTP/stdio and reconnection.
+
+The six original tool contract objects were deep-compared against the saved
+baseline and remained identical. A real legacy MCP initialize response with Skills
+disabled was byte-compared to the previous generated server instructions and was
+identical. Module-resolution hooks verified that both disabled and enabled-but-unused
+servers execute ordinary commands without loading the Skill service or YAML parser.
+`verify:cli`, `release:check` and `git diff --check` passed.
+
+The Apple Silicon precompiled candidate was built from the working tree with
+`dirty: true` explicitly recorded in its manifest. It passed **18 package acceptance
+groups** and the existing **20 real-tool checks**. The new isolated stdio group
+uses the bundled Node/YAML, discovers and reads a synthetic Skill, follows all
+UTF-8 reference pages and then executes an ordinary command. Default-only six-tool
+tests, install/reinstall, lifecycle (mock Tunnel), upgrade/rollback, command conflict,
+complete uninstall and preservation of a synthetic shared user Skill also passed.
+This is a local test candidate, not a replacement for published v1.0.1 assets.
+
+### Performance observations (macOS ARM64, Node 24.15.0)
+
+The existing benchmark preserved all 200,000 output bytes with zero duplicate or
+missing consumed bytes. Its loopback MCP P50/P95 was **13.43/15.84 ms** before
+and **10.97/16.35 ms** after this change. These are separate runs, not a causal
+speedup claim or proof of zero regression.
+
+The dedicated benchmark uses 100 synthetic Skills and interleaves ordinary command
+calls with Skills disabled versus enabled-but-unused. Three runs recorded:
+
+| Measurement | Run 1 | Run 2 | Run 3 |
+| --- | --- | --- | --- |
+| Cold discovery, including HTTP and lazy initialization | 116.68 ms | 64.43 ms | 59.19 ms |
+| Hot discovery P95 | 1.77 ms | 0.95 ms | 0.89 ms |
+| Warm main-instruction read P95 | 2.13 ms | 1.23 ms | 1.39 ms |
+| Ordinary command P95, Skills disabled | 5.19 ms | 3.12 ms | 2.97 ms |
+| Ordinary command P95, enabled but unused | 7.91 ms | 3.11 ms | 3.08 ms |
+| Ordinary command P95 during forced refresh | 8.56 ms | 5.89 ms | 5.87 ms |
+
+The higher first-run tail and concurrent refresh cost are retained here rather
+than hidden. Medians are comparable and later runs were closer, but finite local
+measurements do not establish zero overhead. Read pagination reproduced all
+**124,000 UTF-8 bytes**, with zero missing/duplicate bytes across six resource
+calls. The measured result wire totals include the intentional compatibility mirror:
+4,768 bytes for five short candidates, 1,188 bytes for the sample main instruction,
+and 269,340 bytes across the long reference read. Byte budgets are not exact model
+tokens, and cache accounting is not total process RSS.
+
+Detailed raw reports remain in ignored `reports/` and `.runtime/skills-dev/`.
+No hosted ChatGPT trigger-rate, semantic Skill-selection accuracy, model token
+billing or Tunnel-WAN latency was measured. Those require explicit enablement,
+client metadata refresh and new-conversation acceptance. This checkpoint did not
+run native Linux or Intel Mac CI; the shared package verification is ready for
+those runners when a future release is authorized.
+
 ## Complete uninstall — development after v1.0.0
 
 The source checkout now has a complete interactive `uninstall.sh`. Isolated tests confirm that only explicit `y` / `Y` proceeds, while `n`, empty input and EOF cancel without deletion. Confirmed source removal deletes generated runtime/config/build data and owned command wrappers while retaining the Git checkout, including the pathological case where configured state/log/history paths resolve to the checkout root.

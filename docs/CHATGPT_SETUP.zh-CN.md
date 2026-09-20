@@ -6,7 +6,7 @@
 
 网页入口与官方资料核对日期：**2026-09-20**。不同账号可能显示 Plugins、Apps 或 Connectors。下文给出主入口和备用入口；权限未开放时，应联系管理员或官方支持，而不是尝试绕过限制。
 
-本教程对应**项目 1.0.1 / 工具契约 3.1**。需要登录的账号页面请在自己的浏览器中操作；核对公开文档不代表已经查看了你账户当前的页面。每一步先确认完成标志，再进入下一步；尤其不要在本机两个服务尚未启动时扫描工具。
+本教程对应**项目 1.1.0 / 工具契约 3.1**。需要登录的账号页面请在自己的浏览器中操作；核对公开文档不代表已经查看了你账户当前的页面。每一步先确认完成标志，再进入下一步；尤其不要在本机两个服务尚未启动时扫描工具。
 
 > **密钥安全：**不要把真实 API Key 发到聊天、截图、README 或 GitHub。配置在自己的终端和浏览器里完成。本项目会以启动服务的系统用户权限执行命令，没有额外沙箱；请先阅读[安全说明](../SECURITY.md)。
 
@@ -67,13 +67,13 @@ API Key 页面不会生成 Tunnel ID。组织 ID、工作区 ID、隧道名称�
 <a id="step-2"></a>
 ## 第 2 步：安装预编译运行包
 
-在需要让 ChatGPT 访问的那台电脑打开终端，按[预编译安装指南](BINARY_INSTALL.zh-CN.md)选择 v1.0.1 对应平台压缩包，对照 `SHA256SUMS` 校验后解压，执行包内 `./install.sh`。运行包内置 Node、原生依赖和固定 Tunnel，不必安装 Node/npm/Go/编译器。本版明确跳过发布者签名与 Apple 公证，请在运行下载软件前核对系统要求的许可。
+在需要让 ChatGPT 访问的那台电脑打开终端，按[预编译安装指南](BINARY_INSTALL.zh-CN.md)选择 v1.1.0 对应平台压缩包，对照 `SHA256SUMS` 校验后解压，执行包内 `./install.sh`。运行包内置 Node、原生依赖和固定 Tunnel，不必安装 Node/npm/Go/编译器。本版明确跳过发布者签名与 Apple 公证，请在运行下载软件前核对系统要求的许可。
 
 以 Apple Silicon 为例，下载并完成校验后：
 
 ```bash
-tar -xzf mcp-dev-runtime-1.0.1-darwin-arm64.tar.gz
-cd mcp-dev-runtime-1.0.1-darwin-arm64
+tar -xzf mcp-dev-runtime-1.1.0-darwin-arm64.tar.gz
+cd mcp-dev-runtime-1.1.0-darwin-arm64
 ./install.sh
 ```
 

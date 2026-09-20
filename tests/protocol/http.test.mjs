@@ -7,6 +7,7 @@ import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/cli
 import { Runtime } from '../../dist/runtime/runtime.js';
 import { startHttp } from '../../dist/mcp/http.js';
 import { fixture, delay, nodeCmd } from '../helpers.mjs';
+import { defaultToolAllowlist } from '../../dist/mcp/tool-registry.js';
 const unpack = result => {
   assert(result.content?.[0]?.type==='text');const text=result.content[0].text;const i=text.indexOf('\n');
   return { ...(result.structuredContent ?? JSON.parse(i===-1?text:text.slice(0,i))), output:i===-1?'':text.slice(i+1), isError:result.isError };
@@ -40,7 +41,7 @@ test('HTTP: modern discovery returns real SDK result, not just HTTP 200',async t
 });
 test('HTTP: all six names, parameters, required properties and annotations match contract',async t=>{
   const {c}=await setup(t);const actual=(await c.listTools()).tools;
-  const contract=JSON.parse(await fs.readFile(new URL('../../contracts/tools.json',import.meta.url),'utf8')).tools;
+  const contract=JSON.parse(await fs.readFile(new URL('../../contracts/tools.json',import.meta.url),'utf8')).tools.filter(t=>defaultToolAllowlist.includes(t.name));
   assert.deepEqual(actual.map(x=>x.name).sort(),contract.map(x=>x.name).sort());
   for(const expected of contract){const got=actual.find(x=>x.name===expected.name);assert.deepEqual(got.inputSchema,expected.inputSchema);assert.deepEqual(got.outputSchema,expected.outputSchema);assert.deepEqual(got.annotations,expected.annotations);}
 });

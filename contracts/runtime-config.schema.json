@@ -244,6 +244,36 @@
       ],
       "additionalProperties": false
     },
+    "skills": {
+      "type": "object",
+      "properties": {
+        "extra_roots": {
+          "default": [],
+          "maxItems": 32,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          }
+        },
+        "disabled_paths": {
+          "default": [],
+          "maxItems": 256,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          }
+        }
+      },
+      "required": [
+        "extra_roots",
+        "disabled_paths"
+      ],
+      "additionalProperties": false
+    },
     "image": {
       "type": "object",
       "properties": {
@@ -356,6 +386,7 @@
     "exec",
     "history",
     "tools",
+    "skills",
     "image",
     "patch",
     "request_cache_entries",

@@ -2129,6 +2129,376 @@
           }
         ]
       }
+    },
+    {
+      "name": "discover_skills",
+      "description": "Discover/search local project and user skills for a new substantive development task. Pass the absolute target workdir and a concise task query (include relevant technical keywords). Returns bounded metadata only, never instructions or execution. Omit query to browse, continue with cursor, or refresh=true to recheck disk. Skip simple checks, output polling and unchanged-task continuations. When read_skill is enabled, read selected instructions with it before acting; metadata alone is insufficient. No relevant match: proceed normally. Experimental, opt-in.",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workdir": {
+            "type": "string",
+            "maxLength": 4096,
+            "description": "Absolute existing target project directory.",
+            "minLength": 1
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 2048,
+            "description": "Task intent; omit to browse (including explicit-only skills).",
+            "minLength": 1
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 5
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 2048,
+            "description": "Opaque next_cursor; repeat workdir/query, never combine with refresh.",
+            "minLength": 1
+          },
+          "refresh": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "workdir"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "workdir": {
+            "type": "string",
+            "maxLength": 4096,
+            "description": "Canonical target workspace, not the skill resource directory."
+          },
+          "project_root": {
+            "type": "string",
+            "maxLength": 4096,
+            "description": "Detected project boundary for this lookup."
+          },
+          "catalog_revision": {
+            "type": "string",
+            "maxLength": 4096,
+            "description": "Snapshot revision binding continuation cursors."
+          },
+          "catalog_complete": {
+            "type": "boolean",
+            "description": "False if any discovery limits or unreadable paths prevented a complete inventory."
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "maxLength": 4096
+                },
+                "name": {
+                  "type": "string",
+                  "maxLength": 4096
+                },
+                "description": {
+                  "type": "string",
+                  "maxLength": 4096
+                },
+                "description_truncated": {
+                  "type": "boolean"
+                },
+                "scope": {
+                  "type": "string",
+                  "enum": [
+                    "project",
+                    "user",
+                    "extra"
+                  ]
+                },
+                "origin": {
+                  "type": "string",
+                  "maxLength": 4096
+                },
+                "origin_truncated": {
+                  "type": "boolean"
+                },
+                "implicit_allowed": {
+                  "type": "boolean"
+                },
+                "compatibility": {
+                  "type": "string",
+                  "maxLength": 4096
+                },
+                "dependencies": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "maxLength": 4096
+                  }
+                },
+                "dependencies_complete": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "description",
+                "description_truncated",
+                "scope",
+                "origin",
+                "origin_truncated",
+                "implicit_allowed"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Bounded skill candidates; not instruction bodies."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 4096
+            },
+            "description": "Bounded diagnostic notices; never raw parser input or credentials."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Continue with the same arguments; null indicates the current listing/resource is complete."
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "maxLength": 4096
+              },
+              "message": {
+                "type": "string",
+                "maxLength": 4096
+              },
+              "candidates": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": true,
+            "description": "Pre-result failure. Also inspect MCP isError."
+          }
+        },
+        "additionalProperties": false,
+        "anyOf": [
+          {
+            "required": [
+              "error"
+            ]
+          },
+          {
+            "required": [
+              "workdir",
+              "project_root",
+              "catalog_revision",
+              "catalog_complete",
+              "skills",
+              "warnings",
+              "next_cursor"
+            ]
+          }
+        ],
+        "description": "Bounded structuredContent mirrored in one text result for MCP compatibility. Inspect isError and completeness/cursor fields; discovery and reading never execute a skill."
+      }
+    },
+    {
+      "name": "read_skill",
+      "description": "Read a selected local skill or a necessary text resource. Pass absolute workdir and the discovered ID, or an exact unambiguous name for a user-named skill (no discovery round trip needed). resource defaults to SKILL.md; relative resources resolve inside skill_root, NOT workdir. Read selected instructions fully, following next_cursor until content_complete=true before task actions. Repeat workdir/skill/resource/explicit when continuing. explicit=true only when the user explicitly selected the skill; never grants permissions. Does not execute scripts or install dependencies. Experimental, opt-in.",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workdir": {
+            "type": "string",
+            "maxLength": 4096,
+            "description": "Absolute target project directory.",
+            "minLength": 1
+          },
+          "skill": {
+            "type": "string",
+            "maxLength": 512,
+            "description": "Discovered skill ID or exact unambiguous name.",
+            "minLength": 1
+          },
+          "resource": {
+            "type": "string",
+            "maxLength": 2048,
+            "description": "Skill-relative text path; no traversal, hidden files or URLs.",
+            "minLength": 1,
+            "default": "SKILL.md"
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 2048,
+            "description": "Opaque next_cursor from this resource and workdir.",
+            "minLength": 1
+          },
+          "explicit": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "workdir",
+          "skill"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 4096,
+            "description": "Stable identity of the discovered canonical skill file."
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 4096,
+            "description": "Display name; may be ambiguous across distinct files."
+          },
+          "workdir": {
+            "type": "string",
+            "maxLength": 4096,
+            "description": "Canonical target workspace, not the skill resource directory."
+          },
+          "skill_root": {
+            "type": "string",
+            "maxLength": 4096,
+            "description": "Canonical resource base for this skill; scripts do not default to the task workspace."
+          },
+          "resource": {
+            "type": "string",
+            "maxLength": 4096,
+            "description": "Skill-relative text resource being read."
+          },
+          "revision": {
+            "type": "string",
+            "maxLength": 4096,
+            "description": "SHA-256 content revision of this read snapshot."
+          },
+          "contents": {
+            "type": "string",
+            "description": "Current UTF-8 text page. Follow next_cursor until complete before acting on instructions."
+          },
+          "content_complete": {
+            "type": "boolean",
+            "description": "True only when this resource reached EOF; preceding pages remain required."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Continue with the same arguments; null indicates the current listing/resource is complete."
+          },
+          "compatibility": {
+            "type": "string",
+            "maxLength": 4096,
+            "description": "Declared requirements; availability is not automatically guaranteed."
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 4096
+            },
+            "description": "Declared type:name hints only; no installs or remote connections are made."
+          },
+          "dependencies_verified": {
+            "type": "boolean",
+            "description": "False: this service does not automatically provision or verify declared external tools."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 4096
+            },
+            "description": "Bounded diagnostic notices; never raw parser input or credentials."
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "maxLength": 4096
+              },
+              "message": {
+                "type": "string",
+                "maxLength": 4096
+              },
+              "candidates": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": true,
+            "description": "Pre-result failure. Also inspect MCP isError."
+          }
+        },
+        "additionalProperties": false,
+        "anyOf": [
+          {
+            "required": [
+              "error"
+            ]
+          },
+          {
+            "required": [
+              "id",
+              "name",
+              "workdir",
+              "skill_root",
+              "resource",
+              "revision",
+              "contents",
+              "content_complete",
+              "next_cursor",
+              "warnings"
+            ]
+          }
+        ],
+        "description": "Bounded structuredContent mirrored in one text result for MCP compatibility. Inspect isError and completeness/cursor fields; discovery and reading never execute a skill."
+      }
     }
   ]
 }

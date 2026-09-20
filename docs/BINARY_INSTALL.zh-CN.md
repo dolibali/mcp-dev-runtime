@@ -2,7 +2,7 @@
 
 [English](BINARY_INSTALL.md) | **简体中文**
 
-[v1.0.1 发行页](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.0.1)提供四种平台运行包。每包内置 Node.js 24.21.0、编译后的应用、对应平台的原生依赖，以及按照 `tunnel.lock.json` 精确 commit 构建的 runtime-only Tunnel。安装和运行 MDR 不要求系统另装 Node、npm、Git、Go 或编译器；你自己的开发项目需要的工具仍由自己的环境提供。
+[v1.1.0 发行页](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.1.0)提供四种平台运行包。每包内置 Node.js 24.21.0、编译后的应用、对应平台的原生依赖，以及按照 `tunnel.lock.json` 精确 commit 构建的 runtime-only Tunnel。安装和运行 MDR 不要求系统另装 Node、npm、Git、Go 或编译器；你自己的开发项目需要的工具仍由自己的环境提供。
 
 ## 选择并校验下载文件
 
@@ -18,13 +18,13 @@
 macOS 在下载目录执行：
 
 ```bash
-shasum -a 256 mcp-dev-runtime-1.0.1-darwin-arm64.tar.gz
+shasum -a 256 mcp-dev-runtime-1.1.0-darwin-arm64.tar.gz
 ```
 
 Linux 执行：
 
 ```bash
-sha256sum mcp-dev-runtime-1.0.1-linux-x64-gnu.tar.gz
+sha256sum mcp-dev-runtime-1.1.0-linux-x64-gnu.tar.gz
 ```
 
 将整段哈希与 `SHA256SUMS` 中对应文件名的值核对；文件名替换为实际架构。哈希用于核对一致性，本身不代表发布者身份。已安装 `gh` 的用户还可以执行 `gh attestation verify ARCHIVE --repo dolibali/mcp-dev-runtime`，查看独立的 GitHub 构建来源证明。
@@ -36,8 +36,8 @@ sha256sum mcp-dev-runtime-1.0.1-linux-x64-gnu.tar.gz
 以 Apple Silicon 为例：
 
 ```bash
-tar -xzf mcp-dev-runtime-1.0.1-darwin-arm64.tar.gz
-cd mcp-dev-runtime-1.0.1-darwin-arm64
+tar -xzf mcp-dev-runtime-1.1.0-darwin-arm64.tar.gz
+cd mcp-dev-runtime-1.1.0-darwin-arm64
 ./install.sh
 ```
 
@@ -66,7 +66,7 @@ mdr doctor --offline
 
 Linux 尊重绝对路径形式的 `XDG_CONFIG_HOME`、`XDG_STATE_HOME` 和 `XDG_DATA_HOME`，忽略相对值。`--prefix` 只更改程序版本目录，不更改用户配置位置；`--bin-dir` 指定命令目录。配置必须是当前用户所有、权限 `0600` 的普通文件；配置目录必须是当前用户所有、权限 `0700` 的目录。符号链接或不安全权限会被拒绝，而不是擅自修正；原有配置内容保留。
 
-v1.0.1 只生成一份非敏感 `config.json` 和相邻的私有 `runtime.env`，统一配置会通过 `runtime.env_file` 自动关联它。用纯文本编辑器填写真实 Tunnel ID 和运行密钥；不要把秘密值写进 JSON、聊天或命令参数。已经发布的 v1.0.0 仍保持当时的 split 配置。填写后执行：
+v1.0.1 及以后只生成一份非敏感 `config.json` 和相邻的私有 `runtime.env`，统一配置会通过 `runtime.env_file` 自动关联它。用纯文本编辑器填写真实 Tunnel ID 和运行密钥；不要把秘密值写进 JSON、聊天或命令参数。已经发布的 v1.0.0 仍保持当时的 split 配置。填写后执行：
 
 ```bash
 mdr tunnel-setup
@@ -89,3 +89,7 @@ mdr smoke
 生命周期命令推荐使用 `mdr start [--background|--bg]`、`mdr stop`、`mdr restart [--background|--bg]` 和 `mdr status`；原有 `up/down` 继续作为兼容别名。`restart` 会先确认自己管理的旧实例已经安全停止，再启动新实例；控制器不可达时会 fail-closed，不会根据磁盘 PID 强制结束进程。停止或重启 MCP 也会结束它自己创建的活动命令，因此应先检查正在执行的任务。
 
 本地客户端仍可用 `mdr serve --transport http` 或 `mdr serve --transport stdio`，无需 Tunnel。`serve` 保留调用方工作目录；启动额外实例时应显式配置 `--config` 并使用独立历史目录。源码开发和 npm 发布是另外的路径：npm 包仍保留 private，源码目录里的 `./install.sh` 仍是构建式安装器。
+
+## v1.1.0 的可选本机 Skill
+
+安装或升级不会自动启用 Skill。按[本机 Skill 指南](SKILLS.zh-CN.md)把 `discover_skills`、`read_skill` 合并进已有 `tools.allow`。确认活动任务允许中断后重启选中的安装，再刷新 MCP 应用工具；不需要原生 Skill 上传入口。网页版模型的自然触发效果需要单独验收。

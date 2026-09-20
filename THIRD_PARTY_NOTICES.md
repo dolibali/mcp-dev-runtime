@@ -8,6 +8,18 @@ The public tool vocabulary, custom patch grammar and matching sequence were cons
 
 Runtime and development dependency licenses are included with their installed npm packages. Exact dependency versions and package integrity values are recorded in package-lock.json. MCP Dev Runtime is distributed under Apache-2.0. The npm package remains private to prevent accidental registry publication, independently of the source license.
 
+## Skill metadata parser
+
+The opt-in Skill module uses `yaml` 2.9.1 by Eemeli Aro and contributors (ISC license),
+https://github.com/eemeli/yaml. It is loaded lazily only when a Skill tool is invoked.
+Its license ships with the installed production package and is inventoried in the
+precompiled bundle. The lockfile records the exact package integrity.
+
+The Skill design was compared with public Codex source at commit
+`5c5308fc9a9ee789049d646ef11e5400384b9c6f`. This is a separate design reference,
+not a change to the existing patch-engine reference pin and not a runtime dependency.
+No Codex executable, agent or model is invoked by Skill discovery/reading.
+
 ## Optional OpenAI Secure MCP Tunnel
 
 Repository: https://github.com/openai/tunnel-client

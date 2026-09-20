@@ -6,13 +6,15 @@
 
 Shell commands, interactive terminals, file patches, images and execution history through six MCP tools. Connect locally over HTTP or stdio, or connect ChatGPT through the optional OpenAI Secure MCP Tunnel.
 
+**New in v1.1.0 (opt-in experimental):** [Local Skills](docs/SKILLS.md) provides `discover_skills` / `read_skill`, bounded project/global discovery and complete instruction reading. Disabled by default; the six established tools and their schemas remain unchanged. No additional agent or model is invoked.
+
 **First time connecting ChatGPT?** Follow the [illustrated, click-by-click setup guide](docs/CHATGPT_SETUP.md): enable developer mode, create a Tunnel and API key, start the local service, and select the Tunnel in ChatGPT.
 
 This is an independent community project, not an OpenAI product. The runtime executes operations itself: it does **not** launch Codex, delegate to another agent, or call a model API. It is not a remote-desktop viewer or a mouse/keyboard automation service.
 
 > **Trust boundary:** commands run with the service user's OS permissions. There is no sandbox, command allowlist, additional approval layer or multi-user isolation. Keep the listener on loopback and connect only trusted clients. Returned files, logs and images reach the calling client; local execution does not mean local-only data handling. Read [SECURITY.md](SECURITY.md) before connecting a machine.
 
-**Precompiled v1.0.1:** [Download the matching runtime package](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.0.1) · [Installation and upgrade guide](docs/BINARY_INSTALL.md). Includes Node, native dependencies and the pinned Tunnel; no build toolchain is needed. Publisher signing / Apple notarization are skipped for this release.
+**Precompiled v1.1.0:** [Download the matching runtime package](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.1.0) · [Installation and upgrade guide](docs/BINARY_INSTALL.md). Includes Node, native dependencies and the pinned Tunnel; no build toolchain is needed. Publisher signing / Apple notarization are skipped for this release.
 
 ## Contents
 
@@ -81,9 +83,9 @@ Precompiled package verification runs natively on macOS 14 ARM64, macOS 15 Intel
 <a id="install"></a>
 ## 1. Install
 
-**Recommended:** download a [precompiled release](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.0.1), verify its SHA-256, extract it and run its `./install.sh`. The [binary guide](docs/BINARY_INSTALL.md) covers user directories, commands, coexistence, upgrade and rollback. This installer does not compile or download dependencies.
+**Recommended:** download a [precompiled release](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.1.0), verify its SHA-256, extract it and run its `./install.sh`. The [binary guide](docs/BINARY_INSTALL.md) covers user directories, commands, coexistence, upgrade and rollback. This installer does not compile or download dependencies.
 
-**v1.0.1:** complete uninstall is `./uninstall.sh`. It lists every owned path it will remove and proceeds only after the user enters `y`; precompiled installation also preserves a stable user-level copy so the downloaded archive does not need to be kept. The immutable v1.0.0 archive predates this feature and retains its command-only `./install.sh --unregister`.
+**v1.0.1 and later:** complete uninstall is `./uninstall.sh`. It lists every owned path it will remove and proceeds only after the user enters `y`; precompiled installation also preserves a stable user-level copy so the downloaded archive does not need to be kept. The immutable v1.0.0 archive predates this feature and retains its command-only `./install.sh --unregister`.
 
 ### Source development alternative
 
@@ -114,7 +116,7 @@ Development dependencies are needed for the build. The install path also prepare
 <a id="global-command"></a>
 ### Use the command from any directory
 
-Both installation modes provide the same CLI. Binary packages use their own bundled Node and user-scoped configuration; the source-specific `npm run command:*` instructions below apply to checkouts. v1.0.1 uses `./uninstall.sh` for complete removal; v1.0.0 retains its earlier command-only `./install.sh --unregister`. See [binary installation](docs/BINARY_INSTALL.md).
+Both installation modes provide the same CLI. Binary packages use their own bundled Node and user-scoped configuration; the source-specific `npm run command:*` instructions below apply to checkouts. v1.0.1 and later use `./uninstall.sh` for complete removal; v1.0.0 retains its earlier command-only `./install.sh --unregister`. See [binary installation](docs/BINARY_INSTALL.md).
 
 After successful setup, a **user-level global command** is registered at `~/.local/bin/mcp-dev-runtime`. Setup also tries to register the short `mdr` command automatically when that name is free. If `mdr` conflicts with another program, only the short alias is skipped and the installation still succeeds. Both entries use the same checkout, Node executable, Tunnel cache and configuration; they do not copy a second runtime or require `sudo`. Keep the checkout and its Node installation in place.
 

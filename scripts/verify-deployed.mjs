@@ -5,7 +5,8 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { fromJsonSchema } from '@modelcontextprotocol/server';
-const expectedTools=JSON.parse(await fs.readFile(new URL('../contracts/tools.json',import.meta.url),'utf8')).tools;
+import { defaultToolAllowlist } from '../dist/mcp/tool-registry.js';
+const expectedTools=JSON.parse(await fs.readFile(new URL('../contracts/tools.json',import.meta.url),'utf8')).tools.filter(t=>defaultToolAllowlist.includes(t.name));
 const outputChecks=new Map(expectedTools.map(t=>[t.name,fromJsonSchema(t.outputSchema)]));
 async function validateOutput(name,result){
   assert(result.structuredContent!==undefined,`${name}: missing structuredContent`);
@@ -49,7 +50,7 @@ function pass(name,details={}){report.checks.push({name,status:'passed',...detai
 try {
   await connect();
   const listed=(await client.listTools()).tools;
-  const contract=JSON.parse(await fs.readFile(new URL('../contracts/tools.json',import.meta.url),'utf8')).tools;
+  const contract=expectedTools;
   assert.deepEqual(listed.map(x=>x.name).sort(),contract.map(x=>x.name).sort());
   for(const t of contract) {const actual=listed.find(x=>x.name===t.name);assert.deepEqual(actual.inputSchema,t.inputSchema);assert.deepEqual(actual.outputSchema,t.outputSchema);}
   report.output_schemas_validated=true;

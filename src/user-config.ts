@@ -22,6 +22,7 @@ const unifiedSchema = z.strictObject({
   tools: z.strictObject({
     allow: unknown()
   }).optional(),
+  skills: z.strictObject({ extra_roots: unknown(), disabled_paths: unknown() }).optional(),
   runtime: z.strictObject({
     cwd: unknown(),
     shell: unknown(),
@@ -79,6 +80,7 @@ export function runtimeConfigFromUnified(value: unknown): Record<string, unknown
     ...(doc.image !== undefined ? { image: doc.image } : {}),
     ...(doc.patch !== undefined ? { patch: doc.patch } : {}),
     ...(doc.tools !== undefined ? { tools: doc.tools } : {}),
+    ...(doc.skills !== undefined ? { skills: doc.skills } : {}),
     ...(requestCache.entries !== undefined ? { request_cache_entries: requestCache.entries } : {}),
     ...(requestCache.ttl_ms !== undefined ? { request_cache_ttl_ms: requestCache.ttl_ms } : {}),
     ...(mcp.max_http_body_bytes !== undefined ? { max_http_body_bytes: mcp.max_http_body_bytes } : {}),

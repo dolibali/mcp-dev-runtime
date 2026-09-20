@@ -6,6 +6,7 @@ import * as z from 'zod/v4';
 import { ToolError } from './runtime/errors.js';
 import { defaultToolAllowlist, validateToolAllowlist } from './mcp/tool-registry.js';
 import { isUnifiedUserConfig, runtimeConfigFromUnified } from './user-config.js';
+import { skillsConfigSchema } from './skills/config.js';
 
 const integer = (min: number, max: number, fallback: number) => z.number().int().min(min).max(max).default(fallback);
 export const configSchema = z.strictObject({
@@ -42,6 +43,7 @@ export const configSchema = z.strictObject({
   tools: z.strictObject({
     allow: z.array(z.string().min(1)).default([...defaultToolAllowlist])
   }).prefault({}),
+  skills: skillsConfigSchema.prefault({}),
   image: z.strictObject({
     max_encoded_bytes: integer(1024, 33554432, 8388608),
     max_input_bytes: integer(1024, 134217728, 33554432),
@@ -73,6 +75,8 @@ export async function validateConfig(config: Config): Promise<Config> {
   if (config.exec.default_yield_time_ms > config.exec.max_yield_time_ms ||
       config.exec.default_max_output_tokens > config.exec.max_output_tokens) throw new Error('Default budget exceeds configured maximum.');
   config.tools.allow = validateToolAllowlist(config.tools.allow);
+  config.skills.extra_roots = config.skills.extra_roots.map(p => expandPath(p, config.cwd));
+  config.skills.disabled_paths = config.skills.disabled_paths.map(p => expandPath(p, config.cwd));
   return config;
 }
 export async function loadConfig(filename?: string, overrides: Record<string, unknown> = {}): Promise<Config> {
@@ -82,6 +86,15 @@ export async function loadConfig(filename?: string, overrides: Record<string, un
     const base = path.dirname(path.resolve(filename));
     if (typeof fromFile.cwd === 'string') fromFile.cwd = expandPath(fromFile.cwd, base);
     if (typeof fromFile.shell === 'string') fromFile.shell = expandPath(fromFile.shell, base);
+  }
+  // New Skill path settings are relative to the selected config in either
+  // format. Do not change legacy runtime/launcher path semantics.
+  if (filename && fromFile.skills && typeof fromFile.skills === 'object') {
+    const settings = { ...(fromFile.skills as Record<string, unknown>) };
+    for (const key of ['extra_roots', 'disabled_paths']) {
+      if (Array.isArray(settings[key])) settings[key] = (settings[key] as unknown[]).map(p => typeof p === 'string' ? expandPath(p, path.dirname(path.resolve(filename))) : p);
+    }
+    fromFile.skills = settings;
   }
   // Resolve a missing cwd at invocation time, not when the schema was imported.
   return validateConfig(configSchema.parse({ cwd: process.cwd(), ...fromFile, ...overrides }));

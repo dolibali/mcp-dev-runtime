@@ -1,6 +1,6 @@
 {
   "name": "mcp-dev-runtime",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Local development tools over MCP: shell, terminal sessions, patches and images. No agent or model calls.",
   "scripts": {
     "setup": "bash ./install.sh",
@@ -13,6 +13,8 @@
     "test:protocol": "npm run build && node --test tests/protocol/*.test.mjs",
     "test:all": "npm run test && npm run test:protocol && npm run test:launcher",
     "benchmark": "npm run build && node tests/benchmark/run.mjs",
+    "benchmark:skills": "npm run build && node tests/benchmark/skills.mjs",
+    "test:skills": "npm run build && node --test tests/unit/skills.test.mjs tests/protocol/skills.test.mjs",
     "postinstall": "node scripts/prepare-pty.mjs",
     "smoke": "node scripts/smoke.mjs",
     "doctor": "node scripts/doctor.mjs",
@@ -45,12 +47,13 @@
   "type": "module",
   "private": true,
   "dependencies": {
+    "@modelcontextprotocol/client": "2.0.0",
     "@modelcontextprotocol/node": "2.0.0",
     "@modelcontextprotocol/server": "2.0.0",
     "node-pty": "1.1.0",
     "sharp": "0.35.4",
-    "zod": "4.6.5",
-    "@modelcontextprotocol/client": "2.0.0"
+    "yaml": "2.9.1",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@types/node": "26.6.2",

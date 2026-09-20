@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.1.0 — 2026-09-21
+
+- Add opt-in experimental `discover_skills` and `read_skill`: bounded global/project discovery, metadata-only BM25/Han lookup, exact-name disambiguation, private per-instance scoped cursors and complete UTF-8 resource reading. The six stable defaults and their schemas remain unchanged.
+- Lazily load the Skill service and pinned YAML parser only on an enabled Skill call. No watcher, extra agent/model or implicit script/dependency execution is introduced; ordinary execution never waits on Skill indexing.
+- Add Skill configuration and bilingual guidance, lifecycle/resource-safety tests, isolated HTTP/stdio/package verification and a dedicated interleaved Skill performance benchmark. Hosted-client automatic selection remains a separate acceptance step.
 - Add service-style lifecycle commands: `start`, `stop` and safe `restart`. Existing `up/down` remain compatible aliases, and `--bg` remains a shorthand for `--background`.
 
 ## 1.0.1 — 2026-09-20

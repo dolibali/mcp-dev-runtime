@@ -6,7 +6,7 @@
 
 Web entry points and official references reviewed: **2026-09-20**. Accounts may show Plugins, Apps, or Connectors. The guide provides a main route and an alternative; unavailable permissions require an administrator or official support, not a workaround that bypasses access controls.
 
-This walkthrough targets **project 1.0.1 / tool contract 3.1**. The signed-in account pages must be opened in your own browser; reviewing public documentation is not a claim of having inspected your account's current UI. Complete each checkpoint before moving on. In particular, do not scan tools before both local services are online.
+This walkthrough targets **project 1.1.0 / tool contract 3.1**. The signed-in account pages must be opened in your own browser; reviewing public documentation is not a claim of having inspected your account's current UI. Complete each checkpoint before moving on. In particular, do not scan tools before both local services are online.
 
 > **Key safety:** never put a real API key in chat, screenshots, a README, or GitHub. Complete configuration in your own browser and terminal. The runtime executes with the service user's OS permissions and has no additional sandbox; read [security guidance](../SECURITY.md) first.
 
@@ -67,13 +67,13 @@ This is not the browser's F12 developer-tools panel, and it does not require exp
 <a id="step-2"></a>
 ## Step 2 — Install the precompiled runtime
 
-Open Terminal on the computer you want ChatGPT to access. Follow the [precompiled installation guide](BINARY_INSTALL.md): choose the matching v1.0.1 archive, verify its SHA-256 against `SHA256SUMS`, extract it, and run its `./install.sh`. The runtime includes Node, native dependencies and the pinned Tunnel; no Node/npm/Go/compiler installation is required. Publisher signing and Apple notarization are intentionally skipped, so review any OS approval before running downloaded software.
+Open Terminal on the computer you want ChatGPT to access. Follow the [precompiled installation guide](BINARY_INSTALL.md): choose the matching v1.1.0 archive, verify its SHA-256 against `SHA256SUMS`, extract it, and run its `./install.sh`. The runtime includes Node, native dependencies and the pinned Tunnel; no Node/npm/Go/compiler installation is required. Publisher signing and Apple notarization are intentionally skipped, so review any OS approval before running downloaded software.
 
 For Apple Silicon, after downloading and verifying:
 
 ```bash
-tar -xzf mcp-dev-runtime-1.0.1-darwin-arm64.tar.gz
-cd mcp-dev-runtime-1.0.1-darwin-arm64
+tar -xzf mcp-dev-runtime-1.1.0-darwin-arm64.tar.gz
+cd mcp-dev-runtime-1.1.0-darwin-arm64
 ./install.sh
 ```
 

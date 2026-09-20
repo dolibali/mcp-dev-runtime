@@ -11,7 +11,9 @@ export const toolPolicies: readonly ToolPolicy[] = [
   { name: 'apply_patch', stability: 'stable' },
   { name: 'view_image', stability: 'stable' },
   { name: 'list_exec_sessions', stability: 'stable' },
-  { name: 'terminate_exec_session', stability: 'stable' }
+  { name: 'terminate_exec_session', stability: 'stable' },
+  { name: 'discover_skills', stability: 'experimental' },
+  { name: 'read_skill', stability: 'experimental' }
 ];
 
 export const knownToolNames = new Set(toolPolicies.map(tool => tool.name));

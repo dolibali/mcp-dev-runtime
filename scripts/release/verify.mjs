@@ -94,7 +94,9 @@ try {
   assert.equal(effectiveConfig.tunnel.enabled, true); assert.equal(effectiveConfig.tools.allow.length, 6);
   assert(!JSON.stringify(effectiveConfig).includes('CONTROL_PLANE_API_KEY')); pass('single non-secret config and effective config inspection');
   const toolPolicy = JSON.parse((await run(installedEntry, ['tools', '--json'])).stdout);
-  assert.equal(toolPolicy.tools.filter(t => t.enabled).length, 6); assert(toolPolicy.tools.every(t => t.stability === 'stable'));
+  assert.equal(toolPolicy.tools.filter(t => t.enabled).length, 6);
+  assert(toolPolicy.tools.filter(t => t.enabled).every(t => t.stability === 'stable'));
+  assert.deepEqual(toolPolicy.tools.filter(t => t.stability === 'experimental').map(t => [t.name, t.enabled]), [['discover_skills', false], ['read_skill', false]]);
   pass('default tool allowlist keeps exactly the six stable tools enabled');
   const before = await readFile(configFile, 'utf8');
   await run(installer, installArgs); assert.equal(await readFile(configFile, 'utf8'), before); pass('idempotent reinstall preserves configuration');
@@ -155,6 +157,39 @@ process.on('SIGTERM',()=>s.close(()=>process.exit(0)));\n`, { mode: 0o755 });
     assert.equal(r.structuredContent.output, 'stdio-bundle-ok'); assert.equal(r.structuredContent.exit_code, 0);
   } finally { await client.close(); }
   pass('stdio subprocess executes using only the bundled runtime');
+  // Opt-in Skill tools are tested in a separate stdio process with synthetic
+  // user/project roots. They must not depend on system Node, npm or downloads.
+  const skillDir = path.join(workspace, '.agents', 'skills', 'bundle-skill');
+  const sharedSkill = path.join(home, '.agents', 'skills', 'shared-user-skill');
+  await mkdir(path.join(skillDir, 'references'), { recursive: true });
+  await mkdir(sharedSkill, { recursive: true });
+  const mainSkill = '---\nname: bundle-skill\ndescription: Verify bundled Skill discovery and UTF-8 references.\n---\nRead references/details.md completely. Use existing tools; no new authorization.\n';
+  const reference = '安装包 UTF-8 😀 reference\n'.repeat(3000);
+  await writeFile(path.join(skillDir, 'SKILL.md'), mainSkill);
+  await writeFile(path.join(skillDir, 'references', 'details.md'), reference);
+  await writeFile(path.join(sharedSkill, 'SKILL.md'), '---\nname: shared-user-skill\ndescription: Shared user data must survive MDR uninstall.\n---\nKeep this file.\n');
+  const skillConfig = path.join(temp, 'skills.json');
+  await writeFile(skillConfig, JSON.stringify({ schema_version: 1, runtime: { cwd: workspace, shell: '/bin/bash' },
+    history: { enabled: false }, tools: { allow: [...effectiveConfig.tools.allow, 'discover_skills', 'read_skill'] } }));
+  const skillsClient = new Client({ name: 'bundle-skills-verification', version: '1' });
+  try {
+    await skillsClient.connect(new StdioClientTransport({ command: entry, args: ['serve', '--transport', 'stdio', '--config', skillConfig], env: { ...env, CODEX_HOME: path.join(home, '.codex') } }));
+    assert.equal((await skillsClient.listTools()).tools.length, 8);
+    const found = await skillsClient.callTool({ name: 'discover_skills', arguments: { workdir: workspace, query: 'bundled Skill UTF-8' } });
+    assert.equal(found.isError, false); assert.equal(found.structuredContent.skills[0].name, 'bundle-skill');
+    const id = found.structuredContent.skills[0].id;
+    const loaded = await skillsClient.callTool({ name: 'read_skill', arguments: { workdir: workspace, skill: id } });
+    assert.equal(loaded.isError, false); assert.equal(loaded.structuredContent.contents, mainSkill);
+    let cursor, complete = '';
+    do {
+      const read = await skillsClient.callTool({ name: 'read_skill', arguments: { workdir: workspace, skill: id, resource: 'references/details.md', ...(cursor ? { cursor } : {}) } });
+      assert.equal(read.isError, false); complete += read.structuredContent.contents; cursor = read.structuredContent.next_cursor;
+    } while (cursor);
+    assert.equal(complete, reference);
+    const command = await skillsClient.callTool({ name: 'exec_command', arguments: { cmd: 'printf skills-bundle-ok', workdir: workspace } });
+    assert.equal(command.structuredContent.output, 'skills-bundle-ok'); assert.equal(command.structuredContent.exit_code, 0);
+  } finally { await skillsClient.close(); }
+  pass('opt-in Skill discovery/read, bundled YAML, UTF-8 paging and unchanged execution in isolated stdio');
   await verifyBundle(bundle); await verifyBundle(installed); pass('runtime and diagnostics never modified either program tree');
   const preserved = await readFile(configFile, 'utf8');
   // Exercise real version switching using a synthetic previous package, never uploaded.
@@ -192,6 +227,7 @@ process.on('SIGTERM',()=>s.close(()=>process.exit(0)));\n`, { mode: 0o755 });
   }
   assert.equal(await readFile(foreign, 'utf8'), '#!/bin/sh\nexit 95\n');
   assert.equal(await readFile(path.join(externalHistory, 'KEEP'), 'utf8'), 'user-selected external history');
+  assert((await readFile(path.join(sharedSkill, 'SKILL.md'), 'utf8')).includes('Keep this file.'));
   await verifyBundle(bundle);
   pass('complete uninstaller removes owned program/data/commands while preserving foreign command, external custom history and downloaded bundle');
   const output = { status: 'passed', platform: process.platform, arch: process.arch, source_commit: manifest.source_commit, version: manifest.version,
