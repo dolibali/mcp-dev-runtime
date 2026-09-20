@@ -66,7 +66,7 @@ Use `mcp-dev-runtime` in place of `mdr` when the short command was skipped. The 
 
 Linux honors absolute `XDG_CONFIG_HOME`, `XDG_STATE_HOME` and `XDG_DATA_HOME`; relative values are ignored. `--prefix` changes only the program-version directory, not user configuration. `--bin-dir` selects a different command directory. Config files must be user-owned regular files with mode `0600`, and the config directory must be user-owned mode `0700`; symlinks and unsafe permissions are refused rather than silently repaired. Existing config content is preserved.
 
-The generated launcher already sets `env_file` to its adjacent `runtime.env`. Open the location printed by the installer in a plain-text editor and enter your real Tunnel ID and runtime key. Do not paste secrets into chat or shell command arguments. Follow the [complete ChatGPT tutorial](CHATGPT_SETUP.md) for the official website steps. Then:
+Current development / the next precompiled release generates one non-secret `config.json` plus adjacent private `runtime.env`. The config points `runtime.env_file` at that file automatically. Open `runtime.env` in a plain-text editor and enter your real Tunnel ID and runtime key; do not put secret values in JSON, chat or shell arguments. The already-published v1.0.0 keeps its original split configuration. Then:
 
 ```bash
 mdr tunnel-setup
@@ -76,7 +76,7 @@ mdr doctor
 mdr smoke
 ```
 
-The checks are local readiness/discovery, not proof of the ChatGPT round trip. A normal `status` is concise; `--verbose` gives details and `--json` preserves the machine object. `Uptime` includes seconds. MCP and Tunnel logs use the `logs_dir` in the launcher config; omitted `logs_dir` on a custom/source configuration retains the `state_dir` behavior. There is no separate error.log: inspect mcp.log, tunnel.log and launcher.log at the actual path. Long state paths use a short, private per-user IPC socket under `/tmp`; this does not relocate history or logs.
+The checks are local readiness/discovery, not proof of the ChatGPT round trip. A normal `status` is concise; `--verbose` gives details and `--json` preserves the machine object. `mdr config` shows effective non-secret settings and `mdr tools` shows enabled tool policy. Unified config uses `runtime.logs_dir` / `runtime.state_dir`; legacy split installations retain their old fields. There is no separate error.log.
 
 ## Upgrade, rollback and source coexistence
 
@@ -84,6 +84,6 @@ Review running tasks and run `mdr down` before switching versions. Download and 
 
 An existing source-checkout command is not automatically reassigned to a binary installation. Source config, credentials and `.runtime` are never moved automatically. To coexist, run the binary installer with `--no-global-command` and use the printed absolute installed command path, or use a separate `--bin-dir`. For an explicit migration, stop the old source instance, unregister only its owned commands using its documented command-uninstall operations, then install the binary and deliberately transfer settings in your editor. Avoid two instances on the same ports or history directory.
 
-Use `./install.sh --unregister` with the same prefix/bin options to remove only the binary installation's owned global entries. It does not stop services, remove installed versions, or delete configuration/history. Keep at least one trusted version while using the commands. After unregistering and stopping, old version directories may be removed deliberately; user data is separate.
+The immutable v1.0.0 archive provides `./install.sh --unregister` for command-entry removal only. **Current development adds a complete `./uninstall.sh` for the next release.** It shows the exact owned paths first and requires an explicit `y`; it then safely stops the owned managed instance and removes owned commands, all installed versions, configuration/credentials, default state/history, logs and cache. Installation also stores a stable `uninstall.sh` in the user configuration directory, so the original downloaded archive is not required later. Foreign command files and external custom state/log/history paths without sufficient ownership proof are kept rather than recursively deleted.
 
 `mdr serve --transport http` or `mdr serve --transport stdio` remains available for local clients without Tunnel. `serve` preserves the caller's workspace; use explicit `--config` and a separate history directory when running an additional instance. Source development and npm publication are separate: the npm package remains private, and the source `./install.sh` remains a build-oriented installer.

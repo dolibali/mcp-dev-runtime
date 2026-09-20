@@ -3,6 +3,7 @@ import {readFileSync,lstatSync} from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import {CONTRACT_VERSION} from '../dist/version.js';
+import {defaultToolAllowlist,toolPolicies} from '../dist/mcp/tool-registry.js';
 const root=process.cwd();
 const pkg=JSON.parse(readFileSync('package.json','utf8'));
 const npmLock=JSON.parse(readFileSync('package-lock.json','utf8'));
@@ -13,9 +14,12 @@ assert.equal(CONTRACT_VERSION,tunnel.contract_version);
 const toolchain=JSON.parse(readFileSync('release-toolchain.lock.json','utf8'));
 assert.equal(readFileSync('.node-version','utf8').trim(),toolchain.node_version);
 const tools=JSON.parse(readFileSync('contracts/tools.json','utf8')).tools;
-assert.equal(tools.length,6);for(const t of tools){assert(t.inputSchema);assert(t.outputSchema);}
+for(const t of tools){assert(t.inputSchema);assert(t.outputSchema);}
+assert.deepEqual(tools.map(t=>t.name).sort(),toolPolicies.map(t=>t.name).sort(),'Tool registry and contracts must match exactly.');
+assert.equal(defaultToolAllowlist.length,6,'The current stable default contract must retain the six established tools.');
+assert(defaultToolAllowlist.every(name=>tools.some(t=>t.name===name)),'Every default-enabled tool must have a contract.');
 for(const name of ['LICENSE','NOTICE','THIRD_PARTY_NOTICES.md','SECURITY.md','CONTRIBUTING.md'])assert(readFileSync(name).length>0);
-for(const name of ['install.sh','scripts/setup.mjs']){const s=lstatSync(name);assert(s.isFile(),name+' must be a regular file');assert((s.mode&0o111)!==0,name+' must be executable');}
+for(const name of ['install.sh','uninstall.sh','scripts/setup.mjs']){const s=lstatSync(name);assert(s.isFile(),name+' must be a regular file');assert((s.mode&0o111)!==0,name+' must be executable');}
 let files;
 try{files=execFileSync('git',['ls-files','--cached','--others','--exclude-standard','-z'],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).split('\0').filter(Boolean);}
 catch{files=JSON.parse(readFileSync('SOURCE_MANIFEST.json','utf8')).files.map(x=>x.path);}
@@ -39,4 +43,4 @@ const modules=readFileSync('.gitmodules','utf8');assert(modules.includes(tunnel.
 try{const index=execFileSync('git',['ls-files','--stage','vendor/tunnel-client'],{encoding:'utf8',stdio:['ignore','pipe','pipe']});assert(index.includes(tunnel.upstream.commit),'Gitlink must match tunnel.lock.json');}
 catch(e){if(!readFileSync('SOURCE_MANIFEST.json','utf8'))throw e;}
 if(errors.length)throw new Error(errors.join('\n'));
-console.log(JSON.stringify({release_check:'passed',version:pkg.version,tools:tools.length,candidate_files:files.length,tunnel_commit:tunnel.upstream.commit,scope:'static candidate checks, not a complete secret audit'},null,2));
+console.log(JSON.stringify({release_check:'passed',version:pkg.version,tools:tools.length,default_tools:defaultToolAllowlist.length,candidate_files:files.length,tunnel_commit:tunnel.upstream.commit,scope:'static candidate checks, not a complete secret audit'},null,2));

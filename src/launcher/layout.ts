@@ -46,3 +46,4 @@ export function layout() {
     cache_dir: path.join(PACKAGE_ROOT, '.runtime'), releases_dir: null };
 }
 export function launcherConfigPath(file?: string) { return path.resolve(file ?? path.join(layout().config_dir, 'launcher.config.json')); }
+export function userConfigPath(file?: string) { return path.resolve(file ?? path.join(layout().config_dir, 'config.json')); }

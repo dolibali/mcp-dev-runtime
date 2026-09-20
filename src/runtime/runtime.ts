@@ -11,13 +11,16 @@ export class Runtime {
   readonly exec: ExecManager;
   readonly patch: PatchEngine;
   readonly images: ImageReader;
+  private readonly enabledTools: Set<string>;
   constructor(readonly config: Config) {
     const retry = new RetryCache(config.request_cache_ttl_ms, config.request_cache_entries);
+    this.enabledTools = new Set(config.tools.allow);
     this.exec = new ExecManager(config, retry); this.patch = new PatchEngine(config, retry); this.images = new ImageReader(config);
   }
   async invoke(name: string, args: Record<string, unknown>) {
     const start = performance.now();
     try {
+      if (!this.enabledTools.has(name)) throw new ToolError('TOOL_DISABLED', `Tool is disabled by tools.allow: ${name}`);
       if (name === 'view_image') {
         const image = await this.images.read(args as { path: string; workdir?: string });
         return { content: [{ type: 'text' as const, text: JSON.stringify(image.metadata) }, image.image], structuredContent: image.metadata, isError: false };

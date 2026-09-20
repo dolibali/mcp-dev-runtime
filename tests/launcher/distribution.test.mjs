@@ -62,10 +62,12 @@ test('distribution CLI: paths and init use only user directories and preserve ex
   await f.call(['init']);
   const p = JSON.parse((await f.call(['paths', '--json'])).stdout);
   const before = await readFile(p.runtime_config, 'utf8');
-  const c = JSON.parse(before); assert.equal(c.cwd, f.home); assert(!c.history.directory.startsWith(f.app));
+  const c = JSON.parse(before);
+  assert.equal(p.configuration_mode, 'unified'); assert.equal(p.config_file, p.runtime_config); assert.equal(p.launcher_config, null);
+  assert.equal(c.runtime.cwd, f.home); assert(!c.history.directory.startsWith(f.app)); assert.equal(c.tunnel.enabled, true); assert.equal(c.tools.allow.length, 6);
   await f.call(['init']); assert.equal(await readFile(p.runtime_config, 'utf8'), before);
   assert.equal(await stat(path.join(f.app, 'config.json')).catch(() => null), null);
-  const launch = JSON.parse(await readFile(p.launcher_config, 'utf8')); assert.equal(launch.env_file, 'runtime.env'); assert(!launch.tunnel_bin);
+  assert.equal(c.runtime.env_file, 'runtime.env'); assert.equal(await stat(path.join(path.dirname(p.runtime_config), 'launcher.config.json')).catch(() => null), null);
 });
 test('distribution CLI: explicit log/state overrides remain caller-relative', async t => {
   const f = await binaryFixture(t);

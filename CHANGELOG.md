@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Add a single interactive `uninstall.sh` for complete removal. It requires an explicit `y`, safely stops the owned managed instance, removes owned commands, program versions, configuration/credentials, state/history, logs and cache, and never deletes a source Git checkout itself.
+- Precompiled installation now preserves a stable user-level `uninstall.sh` so uninstall remains available after the downloaded archive is deleted. Foreign commands and unverified external custom state/log paths are never recursively removed.
+- Unify new-install behavior around one non-secret `config.json` plus private `runtime.env`; existing `launcher.config.json + config.json` installations remain supported without automatic migration.
+- Add fail-closed `tools.allow`: the six established tools remain enabled by default, unknown/duplicate/wildcard names fail validation, MCP discovery hides disabled tools, and Runtime rejects bypass attempts. This leaves future experimental tools disabled until explicitly allowed.
+- Add `tunnel.enabled`; disabling it starts and monitors only the local MCP service without Tunnel credentials, binary resolution or the Tunnel health listener.
+- Add read-only `mdr config [--json]` and `mdr tools [--json]` introspection without exposing `runtime.env` contents.
+
 ## 1.0.0 — 2026-09-20
 
 - Ship self-contained native macOS ARM64/x64 and Linux glibc ARM64/x64 archives, with pinned Node 24.21.0, production native dependencies and the unchanged pinned Tunnel.

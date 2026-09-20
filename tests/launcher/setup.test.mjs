@@ -26,8 +26,13 @@ async function fixture(t, { tunnelInitiallyReady = false, tools = ['git', 'make'
   await mkdir(path.join(root, 'dist', 'launcher'), { recursive: true });
   await writeFile(path.join(root, 'dist', 'launcher', 'cli.js'), '// Test-only built entry point\n');
   await writeFile(path.join(root, 'package-lock.json'), '{"lockfileVersion":3}\n');
-  await writeFile(path.join(root, 'config.example.json'), '{"transport":"http","host":"127.0.0.1","port":3001,"cwd":".","shell":"/bin/bash"}\n');
-  await writeFile(path.join(root, 'launcher.config.example.json'), '{"runtime_config":"config.json","state_dir":".runtime","tunnel_health_port":9098}\n');
+  await writeFile(path.join(root, 'config.example.json'), JSON.stringify({
+    schema_version: 1,
+    mcp: { transport: 'http', host: '127.0.0.1', port: 3001, path: '/mcp', health_path: '/healthz' },
+    tunnel: { enabled: true, health_port: 9098 },
+    runtime: { cwd: '.', shell: '/bin/bash', state_dir: '.runtime', logs_dir: '.runtime', env_file: 'runtime.env', shell_env: false },
+    tools: { allow: ['exec_command','write_stdin','apply_patch','view_image','list_exec_sessions','terminate_exec_session'] }
+  }) + '\n');
   await writeFile(path.join(root, '.env.example'), 'CONTROL_PLANE_TUNNEL_ID=tunnel_' + '0'.repeat(32) + '\nCONTROL_PLANE_API_KEY=replace-me\n');
 
   const bin = path.join(root, 'bin'), log = path.join(root, 'calls.log');
@@ -71,7 +76,7 @@ test('setup: first full install builds pinned Tunnel path and creates private co
   assert.equal((await stat(path.join(f.home, '.local/bin/mdr'))).mode & 0o777, 0o755);
   assert.match(first.stdout, /Global command created: .*\/mdr/);
   assert.equal(await readFile(path.join(f.root, 'config.json'), 'utf8'), await readFile(path.join(f.root, 'config.example.json'), 'utf8'));
-  assert.equal(await readFile(path.join(f.root, 'launcher.config.json'), 'utf8'), await readFile(path.join(f.root, 'launcher.config.example.json'), 'utf8'));
+  await assert.rejects(stat(path.join(f.root, 'launcher.config.json')), { code: 'ENOENT' });
   assert.equal((await stat(path.join(f.root, 'runtime.env'))).mode & 0o777, 0o600);
   let calls = (await readFile(f.log, 'utf8')).trim().split('\n');
   assert(calls.includes('ci --include=dev'));
@@ -91,6 +96,14 @@ test('setup: first full install builds pinned Tunnel path and creates private co
   calls = (await readFile(f.log, 'utf8')).trim().split('\n');
   assert.equal(calls.filter(x => x === 'ci --include=dev').length, 1);
   assert.equal(calls.filter(x => x === 'run tunnel:setup -- --build').length, 1);
+});
+
+test('setup: an existing legacy launcher config is preserved untouched', async t => {
+  const f = await fixture(t, { tools: [] });
+  const legacy = '{"runtime_config":"config.json","state_dir":"legacy-state","tunnel_health_port":9198}\n';
+  await writeFile(path.join(f.root, 'launcher.config.json'), legacy);
+  await f.run(['--local-only']);
+  assert.equal(await readFile(path.join(f.root, 'launcher.config.json'), 'utf8'), legacy);
 });
 
 test('setup: an existing mdr command is preserved and only the short alias is skipped', async t => {

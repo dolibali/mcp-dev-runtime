@@ -67,3 +67,8 @@ test('health: malformed, oversized, redirected and slow endpoints are bounded fa
     assert.equal(r.ok,false,route);assert(performance.now()-before<1500);
   }
 });
+test('health: disabled Tunnel reports ready based on MCP only',async t=>{
+  const config=await fixture(t),runtime=new Runtime(config),http=await startHttp(runtime);t.after(()=>http.close());
+  const health=await probePair(http.url.replace('/mcp','/healthz'),undefined,runtime.exec.instanceId);
+  assert.equal(health.availability,'ready');assert.equal(health.mcp.ok,true);assert.equal(health.tunnel.disabled,true);
+});

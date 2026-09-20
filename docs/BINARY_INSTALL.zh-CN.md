@@ -66,7 +66,7 @@ mdr doctor --offline
 
 Linux 尊重绝对路径形式的 `XDG_CONFIG_HOME`、`XDG_STATE_HOME` 和 `XDG_DATA_HOME`，忽略相对值。`--prefix` 只更改程序版本目录，不更改用户配置位置；`--bin-dir` 指定命令目录。配置必须是当前用户所有、权限 `0600` 的普通文件；配置目录必须是当前用户所有、权限 `0700` 的目录。符号链接或不安全权限会被拒绝，而不是擅自修正；原有配置内容保留。
 
-生成的启动器配置已经将 `env_file` 指向相邻的 `runtime.env`。用纯文本编辑器打开安装器显示的文件，填写真实 Tunnel ID 和运行密钥，不要发到聊天或作为 Shell 命令参数。网页操作见[完整 ChatGPT 教程](CHATGPT_SETUP.zh-CN.md)。填写后执行：
+当前开发分支 / 下一个预编译版本只生成一份非敏感 `config.json` 和相邻的私有 `runtime.env`，统一配置会通过 `runtime.env_file` 自动关联它。用纯文本编辑器填写真实 Tunnel ID 和运行密钥；不要把秘密值写进 JSON、聊天或命令参数。已经发布的 v1.0.0 仍保持当时的 split 配置。填写后执行：
 
 ```bash
 mdr tunnel-setup
@@ -76,7 +76,7 @@ mdr doctor
 mdr smoke
 ```
 
-这些只是本地就绪与工具发现检查，不代表已经完成 ChatGPT 往返调用。普通 `status` 是简洁摘要，`--verbose` 显示细节，`--json` 保留机器可读对象；`Uptime` 显示到秒。MCP 与 Tunnel 的日志使用启动器配置中的 `logs_dir`；旧源码配置或自定义配置没有该字段时仍沿用 `state_dir`。没有单独的 error.log，排查实际位置的 mcp.log、tunnel.log 和 launcher.log。状态目录过长时，IPC socket 使用 `/tmp` 下的用户私有短路径，不会因此迁移历史或日志。
+这些只是本地就绪与工具发现检查，不代表已经完成 ChatGPT 往返调用。普通 `status` 是简洁摘要，`--verbose` 显示细节，`--json` 保留机器可读对象；`mdr config` 显示实际生效的非敏感配置，`mdr tools` 显示工具启用策略。统一配置使用 `runtime.logs_dir` / `runtime.state_dir`；旧 split 安装继续兼容旧字段。没有单独的 error.log。
 
 ## 升级、回退与源码版共存
 
@@ -84,6 +84,6 @@ mdr smoke
 
 现有源码版命令不会自动改指向发行版，旧配置、凭据和 `.runtime` 也不会自动搬迁。需要共存时，用 `--no-global-command` 安装发行包并使用打印出的绝对命令路径，或指定另一个 `--bin-dir`。明确迁移时，先停止源码实例、按其说明仅卸载属于自己的命令入口，再安装发行版，并在编辑器中主动转移设置。不要让两个实例使用同一端口或历史目录。
 
-用相同 prefix/bin 参数执行 `./install.sh --unregister`，只移除该发行版拥有的全局入口，不停止服务、不删除版本目录、不清空配置和历史。使用全局命令期间至少保留一个可信版本；确认停止和移除入口后，可主动清理不需要的旧版本目录，用户数据不在程序目录中。
+不可修改的 v1.0.0 压缩包仍提供 `./install.sh --unregister`，它只移除命令入口。**当前开发分支已经为下一个发行版加入完整的 `./uninstall.sh`。**脚本会先展示准备删除的实际 MDR 自有路径，只在明确输入 `y` 后继续；随后安全停止自己管理的实例，删除自己拥有的命令、全部已安装版本、配置/凭据、默认状态/历史、日志和缓存。安装时还会把稳定的 `uninstall.sh` 保存到用户配置目录，因此以后无需保留最初的下载解压目录。外来命令文件以及无法充分证明归属的外部自定义 state/log/history 路径都会保留，不会递归误删。
 
 本地客户端仍可用 `mdr serve --transport http` 或 `mdr serve --transport stdio`，无需 Tunnel。`serve` 保留调用方工作目录；启动额外实例时应显式配置 `--config` 并使用独立历史目录。源码开发和 npm 发布是另外的路径：npm 包仍保留 private，源码目录里的 `./install.sh` 仍是构建式安装器。

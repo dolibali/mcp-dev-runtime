@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
@@ -17,6 +17,20 @@ const checks = [];
 let app, node, entry, env, bundle;
 const pass = name => { checks.push(name); console.log('PASS: ' + name); };
 const run = (cmd, args, extra = {}) => exec(cmd, args, { env, timeout: 60000, maxBuffer: 4 * 1024 * 1024, ...extra });
+const runInput = (cmd, args, input, extra = {}) => new Promise((resolve, reject) => {
+  const child = spawn(cmd, args, { env, cwd: temp, stdio: ['pipe', 'pipe', 'pipe'], ...extra });
+  let stdout = '', stderr = '';
+  child.stdout.on('data', chunk => { stdout += chunk; });
+  child.stderr.on('data', chunk => { stderr += chunk; });
+  const timer = setTimeout(() => child.kill('SIGKILL'), 60000);
+  child.once('error', error => { clearTimeout(timer); reject(error); });
+  child.once('close', (code, signal) => {
+    clearTimeout(timer);
+    if (code === 0) resolve({ stdout, stderr });
+    else reject(new Error(`Uninstaller exited with ${signal ?? code}: ${stderr || stdout}`));
+  });
+  child.stdin.end(input);
+});
 const cli = args => run(entry, args, { cwd: temp });
 async function port() { return new Promise((resolve, reject) => { const s = createServer(); s.on('error', reject); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => resolve(p)); }); }); }
 try {
@@ -73,7 +87,15 @@ try {
   const paths = JSON.parse((await run(installedEntry, ['paths', '--json'])).stdout);
   assert(!paths.state_dir.startsWith(installed)); assert(!paths.logs_dir.startsWith(installed));
   assert.notEqual(paths.logs_dir, paths.state_dir); pass('user-scoped configuration/state/logs and both global commands');
-  const configFile = paths.runtime_config, launchFile = paths.launcher_config;
+  assert.equal(paths.configuration_mode, 'unified'); assert.equal(paths.launcher_config, null);
+  const configFile = paths.config_file;
+  const effectiveConfig = JSON.parse((await run(installedEntry, ['config', '--json'])).stdout);
+  assert.equal(effectiveConfig.configuration_mode, 'unified'); assert.equal(effectiveConfig.configuration_file, configFile);
+  assert.equal(effectiveConfig.tunnel.enabled, true); assert.equal(effectiveConfig.tools.allow.length, 6);
+  assert(!JSON.stringify(effectiveConfig).includes('CONTROL_PLANE_API_KEY')); pass('single non-secret config and effective config inspection');
+  const toolPolicy = JSON.parse((await run(installedEntry, ['tools', '--json'])).stdout);
+  assert.equal(toolPolicy.tools.filter(t => t.enabled).length, 6); assert(toolPolicy.tools.every(t => t.stability === 'stable'));
+  pass('default tool allowlist keeps exactly the six stable tools enabled');
   const before = await readFile(configFile, 'utf8');
   await run(installer, installArgs); assert.equal(await readFile(configFile, 'utf8'), before); pass('idempotent reinstall preserves configuration');
   await assert.rejects(cli(['up']), /Missing CONTROL_PLANE/); pass('missing credentials fail locally without a fabricated ready state');
@@ -81,11 +103,10 @@ try {
   assert.equal(realTunnel.sha256, manifest.tunnel.sha256); assert(realTunnel.path.startsWith(bundle));
   await assert.rejects(cli(['tunnel-setup', '--build']), /separate source checkout/); pass('actual bundled Tunnel identity and no implicit source-build fallback');
   const mp = await port(); let tp = await port(); while (tp === mp) tp = await port();
-  const runtime = JSON.parse(before); runtime.port = mp; runtime.cwd = workspace;
-  await writeFile(configFile, JSON.stringify(runtime, null, 2) + '\n');
-  const launch = JSON.parse(await readFile(launchFile, 'utf8'));
-  launch.state_dir = path.join(home, 'very long state directory ' + 's'.repeat(65));
-  launch.logs_dir = path.join(home, 'separate logs'); launch.tunnel_health_port = tp;
+  const config = JSON.parse(before);
+  config.mcp.port = mp; config.runtime.cwd = workspace;
+  config.runtime.state_dir = path.join(home, 'very long state directory ' + 's'.repeat(65));
+  config.runtime.logs_dir = path.join(home, 'separate logs'); config.tunnel.health_port = tp;
   const mock = path.join(temp, 'mock-tunnel.cjs');
   // Explicit local test double; no cloud request or real credentials.
   await writeFile(mock, '#!' + node + '\n' + `const http=require('node:http'); const a=process.argv.slice(2);
@@ -97,14 +118,14 @@ process.on('SIGTERM',()=>s.close(()=>process.exit(0)));\n`, { mode: 0o755 });
   // The mock shebang must not contain a space: invoke it through a short helper path.
   const shortNode = path.join(temp, 'n'); await symlink(node, shortNode);
   await writeFile(mock, (await readFile(mock, 'utf8')).replace('#!' + node, '#!' + shortNode), { mode: 0o755 });
-  launch.tunnel_bin = mock;
-  await writeFile(launchFile, JSON.stringify(launch, null, 2) + '\n');
-  const envFile = path.join(path.dirname(launchFile), 'runtime.env');
+  config.tunnel.binary = mock;
+  await writeFile(configFile, JSON.stringify(config, null, 2) + '\n');
+  const envFile = path.join(path.dirname(configFile), 'runtime.env');
   await writeFile(envFile, 'CONTROL_PLANE_TUNNEL_ID=tunnel_' + '0'.repeat(32) + '\nCONTROL_PLANE_API_KEY=local-bundle-test-only\n', { mode: 0o600 });
   const first = JSON.parse((await cli(['up', '--background'])).stdout);
   assert.equal(first.state, 'ready'); assert(first.control_socket.length <= 100);
   const state = JSON.parse((await cli(['status', '--json'])).stdout);
-  assert.equal(state.health.availability, 'ready'); assert.equal(state.log_directory, launch.logs_dir);
+  assert.equal(state.health.availability, 'ready'); assert.equal(state.log_directory, config.runtime.logs_dir);
   assert((await cli(['status'])).stdout.includes('Uptime')); assert((await cli(['status', '--verbose'])).stdout.includes('MCP PID'));
   await assert.rejects(run(installer, installArgs), /active or unreachable/); pass('managed lifecycle, separate logs, long-path IPC and active-upgrade guard (mock Tunnel)');
   env.MDR_VERIFICATION_REPORT_DIR = path.join(temp, 'reports');
@@ -148,6 +169,26 @@ process.on('SIGTERM',()=>s.close(()=>process.exit(0)));\n`, { mode: 0o755 });
   const conflicted = await run(installer, installArgs); assert(conflicted.stdout.includes('Skipped short command'));
   assert.equal(await lstat(path.join(bin, 'mdr')).catch(() => null), null); assert((await lstat(installedEntry)).isFile());
   assert.equal(await readFile(foreign, 'utf8'), '#!/bin/sh\nexit 95\n'); pass('foreign short-command conflict skips only mdr');
+  const configDir = path.dirname(configFile), stableUninstaller = path.join(configDir, 'uninstall.sh');
+  const externalHistory = path.join(temp, 'external history kept');
+  await mkdir(externalHistory); await writeFile(path.join(externalHistory, 'KEEP'), 'user-selected external history');
+  const uninstallConfig = JSON.parse(await readFile(configFile, 'utf8'));
+  uninstallConfig.history = { ...(uninstallConfig.history ?? {}), directory: externalHistory };
+  await writeFile(configFile, JSON.stringify(uninstallConfig, null, 2) + '\n');
+  assert((await lstat(stableUninstaller)).isFile());
+  const cancelled = await runInput(stableUninstaller, [], 'n\n');
+  assert(cancelled.stdout.includes('Uninstall cancelled'));
+  assert((await lstat(prefix)).isDirectory()); assert((await lstat(configFile)).isFile()); assert((await lstat(installedEntry)).isFile());
+  pass('complete uninstaller requires explicit y and cancellation removes nothing');
+  const removed = await runInput(stableUninstaller, [], 'y\n');
+  assert(removed.stdout.includes('completely uninstalled'));
+  for (const gone of [prefix, configDir, paths.state_dir, paths.logs_dir, installedEntry, path.join(bin, 'mdr'), stableUninstaller]) {
+    assert.equal(await lstat(gone).catch(error => error.code === 'ENOENT' ? null : Promise.reject(error)), null, gone);
+  }
+  assert.equal(await readFile(foreign, 'utf8'), '#!/bin/sh\nexit 95\n');
+  assert.equal(await readFile(path.join(externalHistory, 'KEEP'), 'utf8'), 'user-selected external history');
+  await verifyBundle(bundle);
+  pass('complete uninstaller removes owned program/data/commands while preserving foreign command, external custom history and downloaded bundle');
   const output = { status: 'passed', platform: process.platform, arch: process.arch, source_commit: manifest.source_commit, version: manifest.version,
     checks, cloud_scope: 'No real Tunnel credentials or cloud round trip. Lifecycle tests use an explicit mock; the real bundled Tunnel identity is separately verified.' };
   await writeFile(archive.replace(/\.tar\.gz$/, '.verification.json'), JSON.stringify(output, null, 2) + '\n');

@@ -220,6 +220,30 @@
       ],
       "additionalProperties": false
     },
+    "tools": {
+      "type": "object",
+      "properties": {
+        "allow": {
+          "default": [
+            "exec_command",
+            "write_stdin",
+            "apply_patch",
+            "view_image",
+            "list_exec_sessions",
+            "terminate_exec_session"
+          ],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "allow"
+      ],
+      "additionalProperties": false
+    },
     "image": {
       "type": "object",
       "properties": {
@@ -331,6 +355,7 @@
     "shell",
     "exec",
     "history",
+    "tools",
     "image",
     "patch",
     "request_cache_entries",

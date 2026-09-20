@@ -5,30 +5,33 @@ import { mkdir, open, stat, rename, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { NAME, VERSION } from '../version.js';
-import { ROOT, options } from './options.js';
+import { ROOT, options, resolveOptions } from './options.js';
 import { current, stopManaged, supervise } from './supervisor.js';
 import { resolveTunnel, buildTunnel, readLock } from './tunnel.js';
 import { loadConfig } from '../config.js';
 import { HistoryStore } from '../runtime/history-store.js';
 import { randomUUID } from 'node:crypto';
-import { layout, launcherConfigPath } from './layout.js';
+import { layout } from './layout.js';
 import { initializeUser } from './initialize.js';
+import { toolPolicies } from '../mcp/tool-registry.js';
 const help=`${NAME} ${VERSION}
 Commands:
   init                                Create missing user configuration (binary distribution)
   serve [--transport http|stdio ...]   Run the MCP server without Tunnel
-  up [--background]                   Start MCP and the locked Tunnel together
+  up [--background]                   Start managed MCP and Tunnel when enabled
   status [--verbose|--json]           Show the managed instance
   down                                Stop only the managed instance
   doctor [--json] [--offline]          Diagnose the installed runtime and selected configuration
   smoke [URL]                         Discover tools and run one harmless command
   paths [--json]                      Show resolved paths used by this installation
+  config [--json]                     Show effective non-secret configuration
+  tools [--json]                      Show enabled and available tool policy
   tunnel-setup [--build]               Check an installed binary or build pinned runtime
   versions                            Show project/tool-contract/Tunnel version pair
   history-clear --confirm              Clear this config's disk history while its writer is stopped
 Options:
-  --launcher-config FILE              Launcher JSON (source-local or binary user config)
-  --config FILE                       MCP runtime JSON
+  --config FILE                       Unified MDR config (legacy runtime JSON remains accepted)
+  --launcher-config FILE              Legacy split launcher JSON (compatibility only)
   --tunnel-bin FILE                    Explicit compatible Tunnel binary
   --state-dir DIR                     Local state and log directory
   --logs-dir DIR                      Separate diagnostic log directory
@@ -87,7 +90,7 @@ function formatStatus(state: StatusRecord,stateDir:string,verbose=false): string
   const logs=Array.isArray(state.logs)?state.logs as StatusRecord[]:[];
   const availability=health.availability??state.state??'unknown';
   const mcpState=mcp.ok===true?'ready':mcp.ok===false?'degraded':'unknown';
-  const tunnelState=tunnel.ok===true?'ready':tunnel.ok===false?'degraded':'unknown';
+  const tunnelState=tunnel.disabled===true?'disabled':tunnel.ok===true?'ready':tunnel.ok===false?'degraded':'unknown';
   const logDir=logs[0]?.file?path.dirname(String(logs[0].file)):stateDir;
   const lines=[
     NAME+' '+(state.version??VERSION),
@@ -109,13 +112,13 @@ function formatStatus(state: StatusRecord,stateDir:string,verbose=false): string
     row('MCP instance',state.mcp_instance??'—'),
     row('Supervisor',state.pid??'—'),
     row('MCP PID',state.mcp_pid??'—'),
-    row('Tunnel PID',state.tunnel_pid??'—'),
+    row('Tunnel PID',tunnel.disabled===true?'disabled':state.tunnel_pid??'—'),
     row('MCP latency',typeof mcp.latency_ms==='number'?mcp.latency_ms.toFixed(2)+' ms':'unknown'),
-    row('Tunnel lat.',typeof tunnel.latency_ms==='number'?tunnel.latency_ms.toFixed(2)+' ms':'unknown'),
+    row('Tunnel lat.',tunnel.disabled===true?'disabled':typeof tunnel.latency_ms==='number'?tunnel.latency_ms.toFixed(2)+' ms':'unknown'),
     row('Memory',bytes(details.rss_bytes)),
     row('Retained',details.retained_sessions!==undefined?details.retained_sessions+' sessions / '+bytes(details.retained_output_bytes)+' output':'unknown'),
     row('History size',history.bytes!==undefined?bytes(history.bytes):'unknown'),
-    row('Tunnel ver.',state.tunnel_version??'unknown')
+    row('Tunnel ver.',tunnel.disabled===true?'disabled':state.tunnel_version??'unknown')
   );
   for(const log of logs)lines.push(row(path.basename(String(log.file??'log')),log.file??'unknown'));
   return lines.join('\n');
@@ -148,27 +151,29 @@ async function main(){
   if(command==='smoke'){
     const {values,positionals}=parseArgs({args,allowPositionals:true,options:{config:{type:'string'},'launcher-config':{type:'string'}}});
     if(positionals.length>1)throw new Error('smoke accepts at most one endpoint URL.');
-    let url=positionals[0];
-    if(!url){
-      const o=await options(values['launcher-config']);
-      const c=await loadConfig(values.config??o.runtime_config);
+    let url=positionals[0], expectedTools:string[]|undefined;
+    if(!url||values.config||values['launcher-config']){
+      const o=await resolveOptions({configFile:values.config,launcherFile:values['launcher-config']});
+      const c=await loadConfig(o.runtime_config);
+      expectedTools=c.tools.allow;
       if(c.transport!=='http')throw new Error('smoke requires HTTP configuration or an explicit URL.');
-      url=`http://${c.host.includes(':')?'['+c.host+']':c.host}:${c.port}${c.mcp_path}`;
+      url??=`http://${c.host.includes(':')?'['+c.host+']':c.host}:${c.port}${c.mcp_path}`;
     }
-    await runScript('smoke.mjs',[url]);return;
+    await runScript('smoke.mjs',[url,...(expectedTools?[JSON.stringify(expectedTools)]:[])]);return;
   }
   if(command==='paths'){
     const {values}=parseArgs({args,options:{
-      'launcher-config':{type:'string'},'state-dir':{type:'string'},'logs-dir':{type:'string'},json:{type:'boolean'}
+      config:{type:'string'},'launcher-config':{type:'string'},'state-dir':{type:'string'},'logs-dir':{type:'string'},json:{type:'boolean'}
     }});
     const overrides:Record<string,unknown>={};
     if(values['state-dir']!==undefined)overrides.state_dir=path.resolve(values['state-dir']);
     if(values['logs-dir']!==undefined)overrides.logs_dir=path.resolve(values['logs-dir']);
-    const launcherFile=launcherConfigPath(values['launcher-config']);
-    const o=await options(values['launcher-config'],overrides);
+    const o=await resolveOptions({configFile:values.config,launcherFile:values['launcher-config'],overrides});
     const result={
       package_root:ROOT,
-      launcher_config:launcherFile,
+      config_file:o.configuration_file,
+      configuration_mode:o.configuration_mode,
+      launcher_config:o.launcher_config_file,
       runtime_config:o.runtime_config??null,
       env_file:o.env_file??null,
       state_dir:o.state_dir,
@@ -180,8 +185,9 @@ async function main(){
       NAME+' '+VERSION,
       '',
       row('Package',result.package_root),
-      row('Launcher',result.launcher_config),
-      row('Runtime cfg',result.runtime_config??'none'),
+      ...(result.configuration_mode==='unified'
+        ? [row('Config',result.config_file??'none')]
+        : [row('Launcher',result.launcher_config??'none'),row('Runtime cfg',result.runtime_config??'none')]),
       ...(result.env_file?[row('Env file',result.env_file)]:[]),
       row('State',result.state_dir),
       row('Logs',result.logs_dir),
@@ -189,15 +195,64 @@ async function main(){
     ].join('\n'));
     return;
   }
+  if(command==='config'){
+    const {values}=parseArgs({args,options:{
+      config:{type:'string'},'launcher-config':{type:'string'},json:{type:'boolean'}
+    }});
+    const o=await resolveOptions({configFile:values.config,launcherFile:values['launcher-config']});
+    const c=await loadConfig(o.runtime_config);
+    const result={
+      configuration_file:o.configuration_file,
+      configuration_mode:o.configuration_mode,
+      mcp:{transport:c.transport,host:c.host,port:c.port,path:c.mcp_path,health_path:c.health_path},
+      tunnel:{enabled:o.tunnel_enabled,health_port:o.tunnel_health_port,ready_timeout_ms:o.ready_timeout_ms,health_interval_ms:o.health_interval_ms},
+      tools:{allow:c.tools.allow},
+      runtime:{cwd:c.cwd,shell:c.shell,state_dir:o.state_dir,logs_dir:o.logs_dir??o.state_dir,env_file:o.env_file??null,shell_env:o.shell_env},
+      logging:{level:c.log_level,max_bytes:o.log_max_bytes,files:o.log_files}
+    };
+    if(values.json){console.log(JSON.stringify(result,null,2));return;}
+    console.log([
+      NAME+' '+VERSION,
+      '',
+      row('Config',result.configuration_file??'defaults'),
+      row('Mode',result.configuration_mode),
+      row('MCP',`${result.mcp.host}:${result.mcp.port}${result.mcp.path}`),
+      row('Tunnel',result.tunnel.enabled?'enabled':'disabled'),
+      row('Tunnel health',result.tunnel.enabled?result.tunnel.health_port:'disabled'),
+      row('Tools',result.tools.allow.length+' enabled'),
+      row('Workspace',result.runtime.cwd),
+      row('State',result.runtime.state_dir),
+      row('Logs',result.runtime.logs_dir),
+      row('Secrets',result.runtime.env_file??'none')
+    ].join('\n'));
+    return;
+  }
+  if(command==='tools'){
+    const {values}=parseArgs({args,options:{
+      config:{type:'string'},'launcher-config':{type:'string'},json:{type:'boolean'}
+    }});
+    const o=await resolveOptions({configFile:values.config,launcherFile:values['launcher-config']});
+    const c=await loadConfig(o.runtime_config),enabled=new Set(c.tools.allow);
+    const entries=toolPolicies.map(tool=>({...tool,enabled:enabled.has(tool.name)}));
+    if(values.json){console.log(JSON.stringify({configuration_file:o.configuration_file,configuration_mode:o.configuration_mode,tools:entries},null,2));return;}
+    const yes=entries.filter(x=>x.enabled),no=entries.filter(x=>!x.enabled);
+    const lines=[NAME+' '+VERSION,'','Enabled'];
+    for(const tool of yes)lines.push('  '+tool.name+(tool.stability==='experimental'?'  (experimental)':''));
+    if(no.length){
+      lines.push('','Available but disabled');
+      for(const tool of no)lines.push('  '+tool.name+'  ('+tool.stability+')');
+    }
+    console.log(lines.join('\n'));return;
+  }
   if(command==='status'){
     const {values}=parseArgs({args,options:{
-      'launcher-config':{type:'string'},'state-dir':{type:'string'},'logs-dir':{type:'string'},verbose:{type:'boolean'},json:{type:'boolean'}
+      config:{type:'string'},'launcher-config':{type:'string'},'state-dir':{type:'string'},'logs-dir':{type:'string'},verbose:{type:'boolean'},json:{type:'boolean'}
     }});
     if(values.verbose&&values.json)throw new Error('status accepts either --verbose or --json, not both.');
     const overrides:Record<string,unknown>={};
     if(values['state-dir']!==undefined)overrides.state_dir=path.resolve(values['state-dir']);
     if(values['logs-dir']!==undefined)overrides.logs_dir=path.resolve(values['logs-dir']);
-    const o=await options(values['launcher-config'],overrides);
+    const o=await resolveOptions({configFile:values.config,launcherFile:values['launcher-config'],overrides});
     const state=await current(o.state_dir);
     console.log(values.json?JSON.stringify(state,null,2):formatStatus(state,o.logs_dir??o.state_dir,values.verbose??false));
     return;
@@ -214,7 +269,7 @@ async function main(){
   if(values['shell-env']!==undefined)overrides.shell_env=values['shell-env'];
   if(values['tunnel-health-port'])overrides.tunnel_health_port=Number(values['tunnel-health-port']);
   if(values['ready-timeout-ms'])overrides.ready_timeout_ms=Number(values['ready-timeout-ms']);
-  const o=await options(values['launcher-config'],overrides);
+  const o=await resolveOptions({configFile:values.config,launcherFile:values['launcher-config'],overrides});
   if(command==='history-clear'){
     if(!values.confirm)throw new Error('history-clear requires --confirm. Stop the writer first; no active service will be stopped automatically.');
     const config=await loadConfig(o.runtime_config);

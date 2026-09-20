@@ -27,7 +27,7 @@ Options:
   --no-global-command  Skip registration in ~/.local/bin (for CI or embedded use).
   --help, -h            Show this help.
 
-The setup never overwrites config.json, launcher.config.json, or runtime.env.
+The setup never overwrites config.json or runtime.env. Existing legacy launcher.config.json files remain supported and untouched.
 It does not install system packages with sudo, brew, or apt.`);
   process.exit(0);
 }
@@ -151,7 +151,6 @@ step('Building MCP Dev Runtime...');
 await run('npm', ['run', 'build']);
 
 await copyIfMissing('config.example.json', 'config.json');
-await copyIfMissing('launcher.config.example.json', 'launcher.config.json');
 await copyIfMissing('.env.example', 'runtime.env', 0o600);
 const envInfo = await lstat(path.join(ROOT, 'runtime.env'));
 if (!envInfo.isFile() || envInfo.isSymbolicLink()) {

@@ -5,16 +5,17 @@ import {spawnSync} from 'node:child_process';
 import path from 'node:path';
 import {parseArgs,isDeepStrictEqual} from 'node:util';
 import {loadConfig} from '../dist/config.js';
-import {options} from '../dist/launcher/options.js';
+import {resolveOptions} from '../dist/launcher/options.js';
 import {current} from '../dist/launcher/supervisor.js';
 import {probe} from '../dist/launcher/health.js';
 const require=createRequire(import.meta.url);
 const {values,positionals}=parseArgs({allowPositionals:true,options:{config:{type:'string'},json:{type:'boolean'},offline:{type:'boolean'},'launcher-config':{type:'string'}}});
-const launch=await options(values['launcher-config']);
-const file=values.config??positionals[0]??launch.runtime_config;
+const selectedConfig=values.config??positionals[0];
+const launch=await resolveOptions({configFile:selectedConfig,launcherFile:values['launcher-config']});
+const file=launch.runtime_config;
 const config=await loadConfig(file);
 const report={checked_at:new Date().toISOString(),node:process.version,platform:process.platform,arch:process.arch,
-  cwd:config.cwd,shell:config.shell,configuration_file:file??null,toolchains:{},
+  cwd:config.cwd,shell:config.shell,configuration_file:launch.configuration_file??file??null,configuration_mode:launch.configuration_mode,toolchains:{},
   scope:'Local configuration, fresh liveness, MCP discovery and managed Tunnel readiness; not a remote ChatGPT round trip.'};
 for(const name of ['rg','git','node']){
   const result=spawnSync(name==='node'?process.execPath:name,['--version'],{encoding:'utf8',timeout:3000});
@@ -44,7 +45,8 @@ if(config.transport==='http'&&!values.offline){
       timer=setTimeout(()=>controller.abort(new Error('MCP discovery timed out')),3000);
       await client.connect(transport);
       const listed=(await client.listTools()).tools;
-      const expected=JSON.parse(await readFile(new URL('../contracts/tools.json',import.meta.url),'utf8')).tools;
+      const allow=new Set(config.tools.allow);
+      const expected=JSON.parse(await readFile(new URL('../contracts/tools.json',import.meta.url),'utf8')).tools.filter(t=>allow.has(t.name));
       const ok=listed.length===expected.length&&expected.every(t=>listed.some(x=>x.name===t.name&&isDeepStrictEqual(x.inputSchema,t.inputSchema)&&isDeepStrictEqual(x.outputSchema,t.outputSchema)));
       report.protocol={ok,tools:listed.map(t=>t.name),schemas_match:ok,commands_executed:0};
     }catch(e){report.protocol={ok:false,reason:e.message};}

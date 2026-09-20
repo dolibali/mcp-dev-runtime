@@ -44,6 +44,13 @@ test('HTTP: all six names, parameters, required properties and annotations match
   assert.deepEqual(actual.map(x=>x.name).sort(),contract.map(x=>x.name).sort());
   for(const expected of contract){const got=actual.find(x=>x.name===expected.name);assert.deepEqual(got.inputSchema,expected.inputSchema);assert.deepEqual(got.outputSchema,expected.outputSchema);assert.deepEqual(got.annotations,expected.annotations);}
 });
+test('HTTP: tools.allow hides disabled tools and Runtime rejects bypass attempts',async t=>{
+  const {c,runtime,config}=await setup(t,{tools:{allow:['list_exec_sessions']}});
+  assert.deepEqual((await c.listTools()).tools.map(x=>x.name),['list_exec_sessions']);
+  const blocked=await runtime.invoke('exec_command',{cmd:'touch should-not-run'});
+  assert.equal(blocked.isError,true);assert.equal(blocked.structuredContent.error.code,'TOOL_DISABLED');
+  await assert.rejects(fs.stat(path.join(config.cwd,'should-not-run')),{code:'ENOENT'});
+});
 test('HTTP: nonzero exit remains a normal tool result; invalid process becomes isError',async t=>{
   const {call}=await setup(t);const r=await drain(call,await call('exec_command',{cmd:'printf failure >&2; exit 9'}));
   assert.equal(r.isError,false);assert.equal(r.exit_code,9);assert.equal(r.output,'failure');

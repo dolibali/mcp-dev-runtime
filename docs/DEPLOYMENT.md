@@ -2,45 +2,45 @@
 
 ## Precompiled v1 distribution
 
-For end-user installation use [BINARY_INSTALL.md](BINARY_INSTALL.md) / [中文预编译安装](BINARY_INSTALL.zh-CN.md). The release marker selects user-scoped config/state/log directories; source checkouts still resolve their existing project-local configuration. Binary packages include Node and Tunnel, so the source-oriented npm/build instructions below are not run inside the installed binary package. The optional `logs_dir` separates log files from `state_dir`; omitted source/custom values retain the old default. Long socket paths use a private per-user hashed IPC directory without moving state or history.
+For end-user installation use [BINARY_INSTALL.md](BINARY_INSTALL.md) / [中文预编译安装](BINARY_INSTALL.zh-CN.md). Current development / the next release uses one non-secret `config.json` plus private `runtime.env`; the published v1.0.0 keeps its original split configuration. Existing `launcher.config.json + config.json` installations remain supported without automatic migration. Binary packages include Node and Tunnel, so source-oriented npm/build instructions are not run inside an installed binary package.
 
-Binary `init` only creates missing private config files and never copies credentials or starts a service. `paths` and `status` report effective locations. Publisher signing/notarization are deliberately skipped for v1.0.0.
+Binary `init` only creates missing private config files and never copies credentials or starts a service. `paths`, `config`, `tools` and `status` report effective paths/policy without printing credential contents. Publisher signing/notarization are deliberately skipped for v1.0.0.
 
 
 First-time installation: [English README](../README.md#install) | [中文部署指南](README.zh-CN.md#install). This page is the operational reference for project 0.3.0 / contract 3.1.
 
 For the complete browser-to-terminal walkthrough, including developer mode and where to create keys and copy Tunnel IDs, see [ChatGPT setup](CHATGPT_SETUP.md) / [ChatGPT 新手图文教程](CHATGPT_SETUP.zh-CN.md).
 
-`npm start` runs only the MCP service. `npm run up` manages both MCP and Tunnel. Do not use both on the same ports simultaneously.
+`npm start` runs only the MCP service. `npm run up` manages MCP plus Tunnel when `tunnel.enabled` is true; with `tunnel.enabled: false`, it manages only MCP and requires no Tunnel credentials. Do not run duplicate services on the same ports.
 
-The default non-secret launcher configuration is `launcher.config.json` in the installed project. Relative paths in that file are relative to that file. CLI path overrides are resolved from the caller's working directory. The MCP runtime config is independent. `up` enforces HTTP transport because it connects the two local processes using a loopback URL.
+The user-facing configuration is one non-secret `config.json`. Internal runtime/launcher objects remain separate, but users no longer need to maintain two files. Unified configuration paths resolve relative to `config.json`; explicit CLI path overrides resolve from the caller. `up` enforces HTTP transport for managed MCP.
 
 | Setting | Resolution / ownership |
 | --- | --- |
-| Runtime `cwd` | Relative to the runtime process launch directory, not the JSON file location. It must already exist. |
-| Runtime `history.directory` | Relative to the resolved runtime `cwd`; an absolute dedicated directory is recommended. |
-| Launcher `runtime_config`, `env_file`, `state_dir`, `tunnel_bin` | Relative to the selected launcher JSON file. |
-| Launcher path flags | Relative to the caller's current directory. |
+| Unified `runtime.cwd`, `runtime.state_dir`, `runtime.logs_dir`, `runtime.env_file`, `tunnel.binary` | Relative to the selected `config.json`. |
+| `history.directory` | Relative to the resolved effective `runtime.cwd`; an absolute dedicated directory is recommended for shared deployments. |
+| Explicit CLI path flags | Relative to the caller's current directory. |
+| Legacy split config | Retains the old runtime/launcher resolution rules; `--launcher-config` remains compatibility-only. |
 | Managed MCP child | Launched from the installed package root. |
 | stdio child | Launched by the MCP client; use absolute paths rather than assuming the client's working directory. |
 
-`cwd` is not an access restriction. The HTTP listener has no application-level authentication or sandbox; leave it on `127.0.0.1`, and do not expose it as a public shared service. Use distinct ports, state directories and history directories for concurrent instances. Change the affected runtime `port` or launcher `tunnel_health_port` when needed; the two listeners must not collide.
+`runtime.cwd` is not an access restriction. The HTTP listener has no application-level authentication or sandbox; leave it on `127.0.0.1`, and do not expose it as a public shared service. Use distinct ports, state directories and history directories for concurrent instances. Change `mcp.port` or `tunnel.health_port` when needed; when Tunnel is enabled the two listeners must not collide.
 
 <a id="ports"></a>
 ## Local ports and changing a conflicting port
 
 | Component | Project default | Configuration field | Address purpose |
 | --- | --- | --- | --- |
-| MCP runtime | `127.0.0.1:3001` | Top-level `port` in the runtime JSON | `/mcp` for tools; `/healthz` for runtime health |
-| Tunnel health listener | `127.0.0.1:9098` | `tunnel_health_port` in the launcher JSON | `/readyz` for Tunnel readiness; not an MCP endpoint |
+| MCP runtime | `127.0.0.1:3001` | `mcp.port` | `/mcp` for tools; `/healthz` for runtime health |
+| Tunnel health listener | `127.0.0.1:9098` | `tunnel.health_port` | `/readyz` for Tunnel readiness; absent when `tunnel.enabled=false` |
 
 These defaults are configuration choices, not ports reserved for this project. Keep a working installation's settings; changing the numbers alone is not a security or performance improvement. No chosen fixed port guarantees freedom from collisions. The launcher checks for conflicts and refuses to take over an unrelated listener instead of silently selecting a different port.
 
-When a port is genuinely occupied, first check that you are not running both `npm start` and `npm run up` against it. Stop only a duplicate instance that you own. If another application needs the port, choose an unused alternative and edit the affected field in the **existing** JSON file, without replacing the rest of your settings. For example, `port: 53123` in `config.json` and `tunnel_health_port: 53124` in `launcher.config.json` are possible local alternatives, not new defaults or guaranteed-free choices. Keep `host` set to `127.0.0.1` and use distinct ports. Managed startup requires a fixed runtime port; `port: 0` is not supported by `up`.
+When a port is genuinely occupied, stop only a duplicate instance you own. Choose unused alternatives by changing `mcp.port` and, when enabled, `tunnel.health_port` in the same `config.json`. For example, 53123 / 53124 are possible local alternatives, not guaranteed-free choices. Keep `mcp.host` at `127.0.0.1`. Managed startup requires a fixed MCP port; `mcp.port: 0` is not supported by `up`.
 
-Before applying changes, inspect active tasks: `down` stops owned commands. Stop the selected managed instance, then start it with the same launcher configuration and env-file selection. The launcher generates its MCP forwarding and probe URLs from the selected configuration; do not edit a Tunnel binary or a public Tunnel ID to change a local port. Keep the same Tunnel selected in ChatGPT. Direct local HTTP clients must use the new `/mcp` URL.
+Before applying changes, inspect active tasks: `down` stops owned commands. Stop the selected managed instance, edit the same `config.json`, then start again. The launcher generates forwarding/probe URLs from `mcp.*`; do not edit a Tunnel ID to change a local port.
 
-`doctor` follows the selected configuration. With the example MCP port above, `smoke` requires `npm run smoke -- http://127.0.0.1:53123/mcp`; `verify:deployed` likewise needs that explicit URL. Those two scripts default to port 3001 and do **not** automatically read runtime JSON. A changed `curl` URL only probes a different address; it does not change any listener. Do not expose `0.0.0.0` or open public inbound ports to resolve a local collision.
+`mdr doctor` and `mdr smoke` follow the selected config. The lower-level `npm run smoke -- URL` and `verify:deployed` still operate on explicit URLs. A changed `curl` URL only probes a different address; it does not change any listener.
 
 ## Initial setup versus normal startup
 
@@ -48,15 +48,15 @@ Successful setup also registers the current user's command in `~/.local/bin`, un
 
 `mdr` is a convenience entry, not a project rename. Normal setup attempts to register it automatically after the canonical command. If any existing `mdr` executable is found on the current PATH, or the destination is occupied by an unrelated entry, setup skips only the short alias and continues successfully with `mcp-dev-runtime`. Manual `npm run command:install -- --name mdr` remains strict and reports the conflict. Remove only the short entry with `npm run command:uninstall -- --name mdr`. [Short command details](../README.md#short-command) / [短命令说明](README.zh-CN.md#short-command).
 
-For management commands (`up`, `down`, `status`, `doctor`, `smoke`, `history-clear`), the CLI first resolves explicit relative file/directory flags against the caller's directory, then uses the installation root as its working-directory base. This aligns doctor/history with the MCP child already launched from that root. `serve` retains caller-cwd semantics. Paths stored inside launcher JSON still resolve against that JSON file. The global `smoke` command follows the selected runtime configuration; `npm run smoke` remains the lower-level URL-based script.
+For management commands (`up`, `down`, `status`, `doctor`, `smoke`, `paths`, `config`, `tools`, `history-clear`), `--config FILE` selects one unified configuration. Explicit CLI path overrides remain caller-relative; paths stored in unified JSON are config-relative. `serve` retains caller-cwd semantics. Legacy `--launcher-config FILE` remains supported without becoming the new default.
 
 The recommended first-run path is `./install.sh` (or `npm run setup`). It installs the locked npm dependencies, builds the runtime, creates local configuration only when absent, then reuses a compatible Tunnel binary or fetches/builds the exact source pinned by `tunnel.lock.json`. Use `--local-only` to omit Tunnel preparation and `--force-tunnel-build` only for a deliberate rebuild. The installer does not install system packages or provision Platform Tunnel records/credentials.
 
-Repeated setup preserves `config.json`, `launcher.config.json` and `runtime.env`. A package-lock fingerprint under ignored `.runtime/setup/` lets it skip `npm ci` after a known-good dependency install. If dependencies have to be replaced while the local supervisor state points at a live managed process, setup refuses the refresh rather than changing `node_modules` underneath that process.
+Repeated setup preserves `config.json` and `runtime.env`; if an old `launcher.config.json` already exists it is also preserved untouched and continues to select legacy split mode. A package-lock fingerprint under ignored `.runtime/setup/` lets setup skip redundant `npm ci`.
 
 `npm run tunnel:setup` remains the read-only compatibility check for the selected Tunnel binary; `npm run tunnel:setup -- --build` is the lower-level explicit build command used by the installer. A source build needs Git, `make` and the Go toolchain required by the pinned module. Go is not required for local-only MCP or when a compatible binary is already available.
 
-A one-time `--tunnel-bin` or `--env-file` does not rewrite launcher configuration. Persist these paths in `launcher.config.json` or pass them again on future starts. Keep credential values in the private env file, not in launcher JSON or CLI arguments. The [README's ChatGPT section](../README.md#chatgpt) explains the separate Platform/workspace setup.
+A one-time `--tunnel-bin` or `--env-file` does not rewrite configuration. Persist their non-secret paths as `tunnel.binary` and `runtime.env_file`; keep credential values in the private env file, never JSON or CLI arguments.
 
 ## Foreground and background
 
@@ -69,7 +69,7 @@ npm run down
 
 A successful `up` reports the managed instance UUID, process IDs, service URLs, runtime version, Tunnel version and binary hash. An existing managed instance is not silently reconfigured; stop it and start again to apply a new config. Manual external services are never automatically adopted or killed.
 
-Keep the same launcher selection for all lifecycle commands. For example, with custom state:
+Keep the same config selection for all lifecycle commands. Prefer storing a custom state directory in `runtime.state_dir`; a temporary override still works:
 
 ```bash
 npm run up -- --state-dir /absolute/path/to/private-state --env-file runtime.env --background
@@ -81,7 +81,7 @@ Inspect `running` and `terminating` executions before `down`: shutdown stops the
 
 The private state directory contains a lifecycle lock, a local control socket, state metadata and logs. No credential values are written to the state record. `down` validates the live control instance rather than signalling a PID recovered from disk. Stale locks are removed only when their recorded owner is not alive; port conflicts still require operator resolution. Process crashes do not imply shell sessions are recoverable.
 
-The supervisor starts MCP, waits for health, starts the locked Tunnel and waits for `/readyz`. Child failure leads to coordinated shutdown. A transient outbound network outage is handled by Tunnel's own reconnect/poll behavior and does not cause automatic duplicate tool commands. Background mode survives closing the original terminal, but no boot service is installed automatically.
+With `tunnel.enabled=true`, the supervisor starts MCP, waits for health, starts the locked Tunnel and waits for `/readyz`. With `false`, it starts only MCP and does not load Tunnel credentials or resolve a Tunnel binary. Child failure leads to coordinated shutdown; no tool command is automatically replayed.
 
 ## Recommended diagnostics
 
@@ -90,9 +90,9 @@ npm run doctor
 npm run smoke
 ```
 
-From the checkout, `doctor` resolves `launcher.config.json` and its runtime config, falling back to the package-local `config.json` when present. `npm run status` is a concise lifecycle/readiness summary; use `npm run status -- --verbose` for operational details or `npm run status -- --json` for the complete supervisor object, including timestamps and component health. Lifecycle `state=ready` alone does not establish current reachability. Default health probes run every five seconds, and sufficiently stale status queries trigger a refresh.
+New installations resolve the single package/user `config.json`. Existing installations with `launcher.config.json` stay in `legacy-split` mode until deliberately migrated. `mdr config` reports which mode is active without printing secrets. `npm run status` remains a concise lifecycle/readiness summary; `--verbose` and `--json` provide details.
 
-`doctor` checks local configuration, toolchains, fresh health and actual six-tool discovery/schema consistency without running user tasks. `--offline` skips connectivity checks. Neither local readiness nor an SDK test proves the ChatGPT round trip; scan tools and perform a harmless call in the actual client as a separate step. For custom launcher configuration, pass `--launcher-config FILE` to doctor and the lifecycle commands.
+`doctor` checks local configuration, toolchains, fresh health and actual discovery/schema consistency for exactly the tools enabled by `tools.allow`, without running user tasks. `--offline` skips connectivity checks. Use `--config FILE` for a custom unified config; `--launcher-config FILE` is legacy compatibility only.
 
 The standalone `--` in `npm run doctor -- --json` separates npm options from script options: npm runs `node scripts/doctor.mjs --json`. It is not optional punctuation to remove when forwarding flags. Plain `npm run doctor` prints a readable pass/attention heading with its report. For JSON consumers, suppress npm's script banner with `npm --silent run doctor -- --json`, or invoke `node scripts/doctor.mjs --json` from the repository root. The `--json` flag belongs to the project script, not npm. See [npm's official run reference](https://docs.npmjs.com/cli/v12/commands/npm-run/).
 

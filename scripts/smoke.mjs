@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
+import { defaultToolAllowlist, validateToolAllowlist } from '../dist/mcp/tool-registry.js';
 const url = process.argv[2] ?? 'http://127.0.0.1:3001/mcp';
+const expected = validateToolAllowlist(process.argv[3] ? JSON.parse(process.argv[3]) : defaultToolAllowlist);
 const client = new Client({name:'local-dev-mcp-smoke',version:'0.1.0'});
 function unpack(result) {
   if (result.isError) throw new Error(JSON.stringify(result.structuredContent ?? result.content));
@@ -10,9 +12,14 @@ function unpack(result) {
 }
 try {
   await client.connect(new StreamableHTTPClientTransport(new URL(url)));
-  const expected=['exec_command','write_stdin','apply_patch','view_image','list_exec_sessions','terminate_exec_session'];
   const tools=(await client.listTools()).tools.map(x=>x.name);
-  assert.deepEqual(tools.sort(),expected.sort());console.log('Tool discovery: PASS (6 tools)');
+  assert.deepEqual([...tools].sort(),[...expected].sort());console.log(`Tool discovery: PASS (${tools.length} tools)`);
+  const required=['exec_command','write_stdin','list_exec_sessions'];
+  if(!required.every(name=>tools.includes(name))){
+    console.log('Execution smoke: SKIPPED (exec_command/write_stdin/list_exec_sessions are not all enabled)');
+    console.log('LOCAL MCP SMOKE PASSED');
+    process.exitCode=0;
+  } else {
   let r=unpack(await client.callTool({name:'exec_command',arguments:{cmd:"printf 'local-dev-mcp-ok'",yield_time_ms:1000}}));
   let output=r.output;const deadline=Date.now()+10000;
   while(r.state==='running'||r.state==='terminating'||r.has_more){
@@ -34,4 +41,5 @@ try {
   } while(cursor);
   assert(found,'Smoke execution was not found in retained session pages');console.log('Session lookup: PASS');
   console.log('LOCAL MCP SMOKE PASSED');
+  }
 } finally {await client.close();}

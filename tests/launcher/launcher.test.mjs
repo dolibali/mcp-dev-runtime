@@ -8,7 +8,7 @@ import {spawn,execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {readLock,compatibleVersion,inspectTunnel} from '../../dist/launcher/tunnel.js';
 import {current,readState,stopManaged} from '../../dist/launcher/supervisor.js';
-import {options} from '../../dist/launcher/options.js';
+import {options,resolveOptions} from '../../dist/launcher/options.js';
 import {mcpEnvironment,launchEnvironment} from '../../dist/launcher/environment.js';
 import {Client,StreamableHTTPClientTransport} from '@modelcontextprotocol/client';
 const exec=promisify(execFile),cli=path.resolve('dist/launcher/cli.js');
@@ -50,6 +50,31 @@ test('launcher: full and runtime version formats match exact tested pin',async()
 test('launcher: configuration paths are relative to the selected config file',async t=>{
  const f=await fixture(t);const file=path.join(f.dir,'launch.json');await writeFile(file,JSON.stringify({runtime_config:'config.json',state_dir:'state',shell_env:false}));
  const o=await options(file);assert.equal(o.runtime_config,f.config);assert.equal(o.state_dir,f.stateDir);assert.equal(o.shell_env,false);
+});
+test('launcher: unified config cannot be combined with legacy launcher selection',async t=>{
+ const f=await fixture(t);const unified=path.join(f.dir,'unified.json'),legacy=path.join(f.dir,'legacy-launcher.json');
+ await writeFile(unified,JSON.stringify({schema_version:1,mcp:{port:f.mp},runtime:{cwd:f.dir,shell:'/bin/bash'}}));
+ await writeFile(legacy,JSON.stringify({runtime_config:'config.json',state_dir:'state'}));
+ await assert.rejects(resolveOptions({configFile:unified,launcherFile:legacy}),/do not combine.*--launcher-config/i);
+});
+test('launcher: unified config can disable Tunnel and start MCP without Tunnel credentials or binary',async t=>{
+ const dir=await mkdtemp('/tmp/mdr-unified-local-');t.after(()=>rm(dir,{recursive:true,force:true}));
+ const mp=await freePort(),state=path.join(dir,'state'),logs=path.join(dir,'logs'),file=path.join(dir,'config.json');
+ await writeFile(file,JSON.stringify({
+  schema_version:1,
+  mcp:{transport:'http',host:'127.0.0.1',port:mp,path:'/mcp',health_path:'/healthz'},
+  tunnel:{enabled:false},
+  runtime:{cwd:dir,shell:'/bin/bash',state_dir:'state',logs_dir:'logs'},
+  logging:{level:'silent'}
+ }));
+ const env={...process.env};delete env.CONTROL_PLANE_API_KEY;delete env.OPENAI_API_KEY;delete env.CONTROL_PLANE_TUNNEL_ID;
+ t.after(async()=>{try{await stopManaged(state);}catch{}});
+ const up=JSON.parse((await exec(process.execPath,[cli,'up','--config',file,'--background'],{env,timeout:20000})).stdout);
+ assert.equal(up.state,'ready');assert.equal(up.health.tunnel.disabled,true);assert.equal(up.tunnel_pid,undefined);
+ assert.equal((await (await fetch(`http://127.0.0.1:${mp}/healthz`)).json()).status,'ok');
+ const status=JSON.parse((await exec(process.execPath,[cli,'status','--config',file,'--json'],{env,timeout:10000})).stdout);
+ assert.equal(status.health.availability,'ready');assert.equal(status.health.tunnel.disabled,true);assert.equal(status.log_directory,logs);
+ assert.equal(JSON.parse((await exec(process.execPath,[cli,'down','--config',file],{env,timeout:10000})).stdout).state,'stopped');
 });
 test('launcher: installed test binary identity and run syntax are inspected',async t=>{const f=await fixture(t);const b=await inspectTunnel(f.fake,await readLock());assert.deepEqual(b.args_prefix,['run']);assert.equal(b.sha256.length,64);});
 test('launcher: MCP child does not inherit control-plane keys',()=>{const env=mcpEnvironment({HOME:'/example',PATH:'/bin',CONTROL_PLANE_API_KEY:'secret',OPENAI_API_KEY:'other',NODE_TEST_CONTEXT:'child-v8'});assert.equal(env.HOME,'/example');assert.equal(env.CONTROL_PLANE_API_KEY,undefined);assert.equal(env.OPENAI_API_KEY,undefined);assert.equal(env.NODE_TEST_CONTEXT,undefined);});

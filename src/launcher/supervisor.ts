@@ -17,7 +17,7 @@ import { privateDirectory } from './private-files.js';
 
 export type State = {
   run_id: string; pid: number; state: 'starting'|'ready'|'stopping'; version: string;
-  control_socket: string; mcp_url: string; mcp_health: string; tunnel_health: string;
+  control_socket: string; mcp_url: string; mcp_health: string; tunnel_health?: string;
   mcp_instance?: string; mcp_pid?: number; tunnel_pid?: number; tunnel_version?: string;
   tunnel_sha256?: string; tunnel_source_commit?: string; started_at: string; log_directory?: string;
 };
@@ -57,8 +57,10 @@ export async function supervise(o: LaunchOptions) {
   if(old.state==='ready'||old.state==='starting')return old;
   const config=await loadConfig(o.runtime_config,{transport:'http'});
   if(config.port===0)throw new Error('Managed startup requires a fixed MCP port; use serve for an ephemeral port.');
-  if(config.port===o.tunnel_health_port)throw new Error('MCP and Tunnel health ports must differ.');
-  const env=await launchEnvironment(o),binary=await resolveTunnel(o.tunnel_bin),lock=await readLock();
+  if(o.tunnel_enabled&&config.port===o.tunnel_health_port)throw new Error('MCP and Tunnel health ports must differ.');
+  const env=o.tunnel_enabled?await launchEnvironment(o):{...process.env};
+  const binary=o.tunnel_enabled?await resolveTunnel(o.tunnel_bin):undefined;
+  const lock=o.tunnel_enabled?await readLock():undefined;
   if(layout().mode==='binary')await privateDirectory(o.state_dir);
   else await mkdir(o.state_dir,{recursive:true,mode:0o700});
   const lockDir=path.join(o.state_dir,'launch.lock'),stateFile=path.join(o.state_dir,'supervisor.json');
@@ -88,13 +90,18 @@ export async function supervise(o: LaunchOptions) {
   const host=config.host.includes(':')?`[${config.host}]`:config.host;
   const state:State={run_id:runId,pid:process.pid,state:'starting',version:VERSION,control_socket:socket,
     mcp_url:`http://${host}:${config.port}${config.mcp_path}`,mcp_health:`http://${host}:${config.port}${config.health_path}`,
-    tunnel_health:`http://127.0.0.1:${o.tunnel_health_port}`,tunnel_source_commit:lock.upstream.commit,
-    tunnel_version:binary.version,tunnel_sha256:binary.sha256,started_at:new Date().toISOString(),log_directory:o.logs_dir??o.state_dir};
+    ...(o.tunnel_enabled?{
+      tunnel_health:`http://127.0.0.1:${o.tunnel_health_port}`,
+      tunnel_source_commit:lock!.upstream.commit,
+      tunnel_version:binary!.version,
+      tunnel_sha256:binary!.sha256
+    }:{}),
+    started_at:new Date().toISOString(),log_directory:o.logs_dir??o.state_dir};
   const children:ChildProcess[]=[],streams:RotatingLog[]=[];
   let health:Awaited<ReturnType<typeof probePair>>|undefined,healthTimer:NodeJS.Timeout|undefined;
   let healthInFlight:Promise<void>|undefined;
   const refreshHealth=():Promise<void>=>healthInFlight??=(async()=>{
-    health=await probePair(state.mcp_health,state.tunnel_health+'/readyz',state.mcp_instance);
+    health=await probePair(state.mcp_health,state.tunnel_health?state.tunnel_health+'/readyz':undefined,state.mcp_instance);
   })().finally(()=>{healthInFlight=undefined;});
   let stopping=false,cancelled=false,startupFinished=false,failed:Error|undefined,resolveDone!:()=>void;
   const done=new Promise<void>(r=>resolveDone=r);
@@ -152,7 +159,8 @@ export async function supervise(o: LaunchOptions) {
     }throw new Error(`Readiness timeout at ${url}; see launcher logs.`);
   }
   try{
-    await available(config.host,config.port);await available('127.0.0.1',o.tunnel_health_port);
+    await available(config.host,config.port);
+    if(o.tunnel_enabled)await available('127.0.0.1',o.tunnel_health_port);
     if(cancelled)throw new Error('Startup cancelled');
     server=httpServer((req,res)=>{
       if(req.headers['x-run-id']!==runId){res.writeHead(409);res.end();return;}
@@ -169,8 +177,10 @@ export async function supervise(o: LaunchOptions) {
     const mcp=await start(process.execPath,args,mcpEnvironment(env),'mcp');state.mcp_pid=mcp.pid;await save();
     await waitHealth(state.mcp_health,text=>{const h=JSON.parse(text);if(h.server!==NAME||h.version!==VERSION||h.status!=='ok')return false;state.mcp_instance=h.instance_id;return true;});
     if(cancelled||stopping)throw new Error('Startup cancelled');
-    const tunnel=await start(binary.path,[...binary.args_prefix,`--mcp.server-url=${state.mcp_url}`,`--health.listen-addr=127.0.0.1:${o.tunnel_health_port}`,'--log.level=warn','--log.format=struct-text'],env,'tunnel');
-    state.tunnel_pid=tunnel.pid;await save();await waitHealth(state.tunnel_health+'/readyz',s=>s.trim()==='ready');
+    if(o.tunnel_enabled){
+      const tunnel=await start(binary!.path,[...binary!.args_prefix,`--mcp.server-url=${state.mcp_url}`,`--health.listen-addr=127.0.0.1:${o.tunnel_health_port}`,'--log.level=warn','--log.format=struct-text'],env,'tunnel');
+      state.tunnel_pid=tunnel.pid;await save();await waitHealth(state.tunnel_health!+'/readyz',s=>s.trim()==='ready');
+    }
     // Publish the initial health snapshot before exposing lifecycle "ready".
     // A status request can be served while save() yields to the event loop;
     // it must never receive ready with an absent health object in that window.

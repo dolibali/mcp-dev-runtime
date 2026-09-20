@@ -1,5 +1,21 @@
 # Validation record
 
+## Complete uninstall — development after v1.0.0
+
+The source checkout now has a complete interactive `uninstall.sh`. Isolated tests confirm that only explicit `y` / `Y` proceeds, while `n`, empty input and EOF cancel without deletion. Confirmed source removal deletes generated runtime/config/build data and owned command wrappers while retaining the Git checkout, including the pathological case where configured state/log/history paths resolve to the checkout root.
+
+At the uninstall-only checkpoint, the local source regression passed **199 tests** (**104 unit, 32 protocol, 63 launcher**), with no failures or skips, plus `verify:cli` and `release:check`. A rebuilt Apple Silicon precompiled candidate then passed **15 package-verification groups** and the existing **20 real-tool checks**. That package verification covers the stable installed uninstaller, cancellation, complete owned program/default-user-data removal, preservation of an unrelated `mdr` executable, preservation of explicitly external custom history, and retention of the downloaded bundle itself. The published v1.0.0 assets are immutable and do not retroactively gain this script.
+
+## Unified configuration and tool policy — development after v1.0.0
+
+New installations now create one non-secret `config.json` plus private `runtime.env`. Existing `launcher.config.json + config.json` installations remain in `legacy-split` mode and are not rewritten automatically. Regression coverage verifies unified relative-path semantics, preservation of existing legacy launcher files, `--config` across lifecycle/doctor/smoke/paths, and read-only `config` / `tools` inspection without credential contents.
+
+`tools.allow` is fail-closed at both MCP registration and Runtime invocation. The established six tools remain enabled by default; unknown names, duplicates and wildcard entries are rejected. A disabled tool is absent from MCP discovery and a direct Runtime bypass returns `TOOL_DISABLED` before side effects. `tunnel.enabled=false` was also exercised through the managed launcher: MCP reaches ready without Tunnel credentials, Tunnel binary resolution or a Tunnel health listener, and status explicitly reports Tunnel disabled.
+
+The current full source regression passed **206 tests** (**106 unit, 33 protocol, 67 launcher**), with no failures or skips, plus `verify:cli` and `release:check`. The local benchmark completed with runtime **p50 7.26 ms / p95 9.99 ms** and MCP HTTP **p50 10.89 ms / p95 16.00 ms**; the 200,000-byte output check reported **0 duplicate and 0 missing bytes**. These are local measurements, not throughput guarantees.
+
+After the unified-config changes, a fresh Apple Silicon precompiled candidate was rebuilt and passed **17 package-verification groups** plus the same **20 real-tool checks**. The package verifier confirms unified config mode, one effective non-secret config, exactly six default-enabled stable tools, ordinary Tunnel-managed lifecycle, upgrade/rollback, complete uninstall, stdio and all six MCP tools. No published v1.0.0 asset was changed.
+
 ## v1.0.0 precompiled distribution
 
 The release workflow is the source of truth for the final per-platform result. Every published archive must pass `scripts/release/verify.mjs` on its native runner and match the same clean source commit. The release-level `VERIFICATION.json` and per-archive `BUILD-MANIFEST.json` record results, versions, platform and skipped publisher signing. Local macOS ARM64 candidates passed the package acceptance checks, including the 20 real-tool checks, under an isolated HOME and guarded PATH without system build tools. The final package gate also checks the documentation links and anchors after packaging, rather than assuming source-README anchors exist in the binary landing page.

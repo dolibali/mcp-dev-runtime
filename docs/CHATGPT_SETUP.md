@@ -146,7 +146,7 @@ The key's principal must independently have Read + Use on that tunnel; selecting
 <a id="step-5"></a>
 ## Step 5 — Fill the local credentials file
 
-The installer already created a private `runtime.env` and configured the launcher to read it. Use `mdr paths` to locate the launcher configuration, then open the adjacent `runtime.env` with a plain-text editor. Defaults are macOS `~/Library/Application Support/mcp-dev-runtime/runtime.env` and Linux `~/.config/mcp-dev-runtime/runtime.env` (absolute XDG overrides are respected).
+The installer already created a private `runtime.env` and configured MDR to read it. Use `mdr paths` to locate the effective config, then open the adjacent `runtime.env` with a plain-text editor. Defaults are macOS `~/Library/Application Support/mcp-dev-runtime/runtime.env` and Linux `~/.config/mcp-dev-runtime/runtime.env` (absolute XDG overrides are respected).
 
 For the macOS default:
 
@@ -163,7 +163,7 @@ CONTROL_PLANE_API_KEY=replace-with-your-own-runtime-key
 
 These example values are **not valid credentials**. Do not include smart quotes, Markdown backticks or embedded line breaks. In nano use **Control+O → Enter**, then **Control+X** (Control, not Command). Do not screenshot, print or paste the secret into chat/Git; keep the file private mode `0600`. A leaked key should be revoked/replaced, not only removed from the latest text. [Official API-key safety guidance](https://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety).
 
-The generated launcher has `env_file: "runtime.env"`, resolved relative to its own configuration file. Nonempty exported environment variables still take precedence. Source installations instead use their existing project-local env file and launcher settings; no credential migration is automatic.
+Current unified configuration sets `runtime.env_file: "runtime.env"`, resolved from the config directory. Nonempty exported credential variables still take precedence. Existing legacy split installations keep their launcher/env settings; no credential migration is automatic.
 
 **Checkpoint:** both actual values are saved locally, not in chat or the repository.
 

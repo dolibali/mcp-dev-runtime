@@ -83,6 +83,8 @@ Precompiled package verification runs natively on macOS 14 ARM64, macOS 15 Intel
 
 **Recommended:** download a [precompiled release](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.0.0), verify its SHA-256, extract it and run its `./install.sh`. The [binary guide](docs/BINARY_INSTALL.md) covers user directories, commands, coexistence, upgrade and rollback. This installer does not compile or download dependencies.
 
+**Current development branch:** complete uninstall is now `./uninstall.sh`. It lists every owned path it will remove and proceeds only after the user enters `y`. The already-published immutable v1.0.0 archive predates this script; its command-only `./install.sh --unregister` remains available there. The next precompiled release will install a stable user-level copy of `uninstall.sh` so the downloaded archive does not need to be kept.
+
 ### Source development alternative
 
 Clone the repository below; a private repository requires an account with access. For a fork, use its clone URL instead. For an extracted source archive, skip cloning and enter the extracted project directory.
@@ -93,7 +95,7 @@ cd mcp-dev-runtime
 ./install.sh
 ```
 
-The setup is intentionally local and repeatable. It installs the exact npm dependency lock, builds the runtime, creates `config.json`, `launcher.config.json` and `runtime.env` **only when missing**, verifies or builds the Tunnel source pinned by `tunnel.lock.json`, and finishes with offline diagnostics. If a compatible pinned Tunnel binary is already present, it is reused; otherwise the setup fetches the exact locked source and builds `tunnel-client-runtime` into the ignored `.runtime/bin/<commit>/` cache. It never installs system packages with `sudo`, Homebrew or apt, and never overwrites your local configuration or credentials.
+The setup is intentionally local and repeatable. New installations create only **one non-secret `config.json` plus private `runtime.env`** when missing, then verify or build the Tunnel source pinned by `tunnel.lock.json` and finish with offline diagnostics. Existing legacy `launcher.config.json + config.json` installations remain supported and are never rewritten automatically. If a compatible pinned Tunnel binary is already present, it is reused; otherwise setup fetches the exact locked source and builds `tunnel-client-runtime` into the ignored `.runtime/bin/<commit>/` cache. It never installs system packages with `sudo`, Homebrew or apt, and never overwrites existing configuration or credentials.
 
 For local-only HTTP/stdio use, skip Tunnel preparation:
 
@@ -105,14 +107,14 @@ The equivalent npm entry point is `npm run setup`; pass setup flags after npm's 
 
 On a repeated run, a package-lock hash under ignored `.runtime/setup/` avoids an unnecessary `npm ci` when dependencies are already known to match. If dependencies do need refreshing and a launcher-managed runtime appears active, setup refuses to replace `node_modules` underneath it. Stop owned work first rather than forcing the refresh.
 
-The example config works from the repository root. To work elsewhere, edit `config.json` and set `cwd` to an **existing absolute workspace directory**. `cwd` is a default, not a filesystem access restriction. An explicit absolute `history.directory` is useful when several projects share one runtime; see [configuration](#configuration).
+The example config works from the repository root. To work elsewhere, edit `config.json` and set `runtime.cwd` to an **existing workspace directory**. In the unified format, configuration paths are resolved relative to `config.json`; `history.directory` is still resolved from the effective workspace. `cwd` is a default, not a filesystem access restriction. See [configuration](#configuration).
 
 Development dependencies are needed for the build. The install path also prepares this checkout's native PTY helper; native packages may still require the platform build prerequisites listed above when no compatible prebuilt package exists. This repository is currently `private: true` in `package.json` to prevent accidental **npm publication**. It does not prevent GitHub source distribution; do not assume `npx mcp-dev-runtime` installs this project.
 
 <a id="global-command"></a>
 ### Use the command from any directory
 
-Both installation modes provide the same CLI. Binary packages use their own bundled Node and user-scoped configuration; the source-specific `npm run command:*` instructions below apply to checkouts. Binary command removal uses `./install.sh --unregister` with the original prefix/bin options. See [binary installation](docs/BINARY_INSTALL.md).
+Both installation modes provide the same CLI. Binary packages use their own bundled Node and user-scoped configuration; the source-specific `npm run command:*` instructions below apply to checkouts. Current development uses `./uninstall.sh` for complete removal; v1.0.0 retains its earlier command-only `./install.sh --unregister`. See [binary installation](docs/BINARY_INSTALL.md).
 
 After successful setup, a **user-level global command** is registered at `~/.local/bin/mcp-dev-runtime`. Setup also tries to register the short `mdr` command automatically when that name is free. If `mdr` conflicts with another program, only the short alias is skipped and the installation still succeeds. Both entries use the same checkout, Node executable, Tunnel cache and configuration; they do not copy a second runtime or require `sudo`. Keep the checkout and its Node installation in place.
 
@@ -140,13 +142,15 @@ mdr status
 mdr status --verbose
 mdr status --json
 mdr paths
+mdr config
+mdr tools
 ```
 
 Plain `status` is a short human-readable summary for daily checks. `--verbose` adds process IDs, instance IDs, latency, memory, retained-session/history sizes and Tunnel version. `--json` preserves the complete machine-readable supervisor object for scripts and deep troubleshooting. The long `mcp-dev-runtime` command supports the same flags; from npm use `npm run status -- --json` or `npm run status -- --verbose`.
 
-`mdr paths` shows only the paths actually resolved for the current installation. It does not preview hypothetical future locations or migrate anything. Source and precompiled distributions use the same command to report their effective paths. Use `mdr paths --json` for machine-readable output.
+`mdr paths` shows only the paths actually resolved for the current installation. `mdr config` shows effective **non-secret** settings, and `mdr tools` shows which registered tool policies are enabled. None of these commands prints the contents of `runtime.env`. Add `--json` for machine-readable output.
 
-For startup without typing the credentials path each time, merge `"env_file": "runtime.env"` into the **existing** `launcher.config.json` (do not replace the other settings). The value is a filename, not the API key. You can then use `mcp-dev-runtime up --background` and `mcp-dev-runtime down` from any directory. With explicit `--env-file FILE`, a relative FILE is resolved from the terminal's current directory; use an absolute path when appropriate. Registration itself never reads or changes `runtime.env` and never starts or stops a service.
+New unified configs set `runtime.env_file` to `runtime.env`, so `mcp-dev-runtime up --background` can be used from any directory without putting a secret on the command line. Existing legacy launcher configs keep their previous `env_file` behavior. An explicit `--env-file FILE` remains a temporary override and is resolved from the invoking terminal. Registration itself never reads or changes `runtime.env` and never starts or stops a service.
 
 Management commands use the installed checkout's configuration and working-directory base, not another project's same-named files. Explicit path flags remain caller-relative. `mcp-dev-runtime serve` is different: it keeps the caller's working directory for local HTTP/stdio use. Global `smoke` derives its URL from the selected configuration; the older `npm run smoke` script still takes an explicit URL for nondefault ports.
 
@@ -158,7 +162,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 Add that line to the relevant shell startup file for future terminals; the installer does **not** modify `.zshrc`, `.bashrc` or other profiles. An existing unrelated command is never overwritten. A command earlier on PATH is reported rather than silently replaced. Each registered wrapper uses the Node selected at registration; after intentionally removing/moving that Node version, register again with the desired compatible Node.
 
-Remove just this checkout's command with `npm run command:uninstall` from the repository. Configurations, Tunnel, history and running services remain untouched. Unregister before moving the checkout, then register from its new location; an old entry is not silently reassigned to a different source root. Advanced installations can use `npm run command:install -- --bin-dir /absolute/path/to/bin` and the same `--bin-dir` when uninstalling. Use `./install.sh --no-global-command` for CI or embedded installs that must not register a command.
+Remove just this checkout's command with `npm run command:uninstall` from the repository. Configurations, Tunnel, history and running services remain untouched. For a **complete source uninstall**, run `./uninstall.sh`; after explicit `y` confirmation it safely stops this checkout's managed instance and removes its owned commands, local configuration/credentials, runtime/history data, `dist` and `node_modules`, while deliberately keeping the Git checkout itself. Unregister before moving the checkout, then register from its new location; an old entry is not silently reassigned to a different source root. Advanced installations can use `npm run command:install -- --bin-dir /absolute/path/to/bin` and the same `--bin-dir` when uninstalling. Use `./install.sh --no-global-command` for CI or embedded installs that must not register a command.
 
 <a id="short-command"></a>
 #### Short command: `mdr`
@@ -283,7 +287,7 @@ The zero-filled ID is an example, not a working tunnel. IDs use `tunnel_` follow
 
 Exported nonempty credential variables take precedence over the env file. `runtime.env` is parsed as data: no `$HOME` expansion, shell sourcing or command substitution. The launcher removes control-plane keys from the MCP child environment; this is hygiene, not a security sandbox.
 
-Optionally add `"env_file": "runtime.env"` to `launcher.config.json` so future starts can omit `--env-file`. Persist a custom `tunnel_bin` there too. Launcher file paths are relative to that configuration file.
+The unified config already references the adjacent `runtime.env` through `runtime.env_file`. A custom Tunnel binary can be configured as `tunnel.binary`. Keep credential **values** only in `runtime.env`, never in JSON.
 
 ### Step 4 — Start and verify
 
@@ -293,7 +297,7 @@ npm run doctor
 npm run smoke
 ```
 
-Expect `doctor` to report `PASS`, with `runtime.ok` and `protocol.ok` true and the selected supervisor's `health.availability` equal to `ready`. Inspect individual toolchain results and history warnings too. From this checkout, `doctor` follows `launcher.config.json` and its selected runtime config, falling back to this checkout's `config.json` when present. Use `-- --config FILE` or `-- --launcher-config FILE` for a different installation. `smoke` separately executes a harmless command against the default endpoint. These are **local checks**, not proof of a successful ChatGPT round trip.
+Expect `doctor` to report `PASS`, with `runtime.ok` and `protocol.ok` true and the selected supervisor's `health.availability` equal to `ready`. `doctor` and lifecycle commands use the same `--config FILE`; `--launcher-config FILE` remains only for legacy split installations. `smoke` validates the **configured tool allowlist** and executes a harmless command when the execution/session tools are enabled. These are **local checks**, not proof of a successful ChatGPT round trip.
 
 `npm run status` is available for lifecycle details. The two raw `curl` probes are optional component-level troubleshooting, not extra required setup steps; see [ports and direct probes](docs/DEPLOYMENT.md#ports).
 
@@ -384,34 +388,49 @@ Inspect `output_gap`, `tail_truncated`, `archive_truncated` and `history_warning
 
 | File | Purpose | Commit it? |
 | --- | --- | --- |
-| `config.example.json` | Public runtime defaults | Yes |
-| `config.json` | Your runtime settings and paths | No |
-| `launcher.config.example.json` | Public launcher defaults | Yes |
-| `launcher.config.json` | Your runtime-config path, state directory and optional binary/env paths | No |
+| `config.example.json` | Public unified MCP / Tunnel / tools / runtime defaults | Yes |
+| `config.json` | Your single non-secret MDR configuration | No |
+| `launcher.config.example.json` | Legacy split-config compatibility example | Yes |
+| `launcher.config.json` | Existing legacy launcher settings; new installs do not create it | No |
 | `.env.example` | Placeholder credentials and proxy examples | Yes, placeholders only |
 | `runtime.env` | Your runtime credentials | **Never** |
 | `tunnel.lock.json` | Public version and source-pin pairing | Yes |
+
+The unified file groups settings under `mcp`, `tunnel`, `tools`, `runtime`, `exec`, `history`, `logging` and `request_cache`. `tools.allow` is fail-closed: only explicitly listed tools are registered and callable. The six established tools are enabled by default; future experimental tools can be implemented without becoming visible until explicitly allowed. Unknown, duplicate and wildcard tool names are rejected.
 
 <a id="ports"></a>
 ### Default ports
 
 | Listener | Default | Setting to change only when necessary |
 | --- | --- | --- |
-| Local MCP, including `/mcp` and `/healthz` | `127.0.0.1:3001` | Top-level `port` in `config.json` |
-| Tunnel health, including `/readyz` | `127.0.0.1:9098` | `tunnel_health_port` in `launcher.config.json` |
+| Local MCP, including `/mcp` and `/healthz` | `127.0.0.1:3001` | `mcp.port` in `config.json` |
+| Tunnel health, including `/readyz` | `127.0.0.1:9098` | `tunnel.health_port` in `config.json` |
 
 These are configurable project defaults, not reserved ports for this project or a guarantee against conflicts. Keep them for an installation that already works. On a conflict, stop only a known duplicate instance or choose unused, distinct local ports; do not change the listener to `0.0.0.0` or open public firewall ports as a workaround. Changing a port is not a security feature.
 
-Check active work before stopping, edit the existing local JSON fields, then restart with the same launcher config. The managed launcher derives its MCP forwarding URL from the runtime config. Changing these local ports does not change the Tunnel ID. Update any direct HTTP client's URL and pass the new URL to `smoke`/`verify:deployed`; those scripts do not automatically read `config.json`. Changing only a URL in a `curl` command does not move the service. See [the port-change procedure](docs/DEPLOYMENT.md#ports).
+Check active work before stopping, edit the existing `config.json`, then restart with the same config. The launcher derives the Tunnel forwarding URL from `mcp.*`. Changing local ports does not change the Tunnel ID. The global `mdr smoke` follows the selected config; lower-level URL-based verification still needs the actual endpoint. See [the port-change procedure](docs/DEPLOYMENT.md#ports).
 
-Runtime CLI flags override runtime JSON. Runtime `cwd` resolves against the process launch directory, **not** the JSON file's directory; relative `history.directory` resolves against the resolved runtime `cwd`. Relative launcher-file paths resolve against the launcher file; CLI path overrides resolve against the invoking shell. Prefer absolute workspace/history paths in deployed installations.
+CLI flags override JSON. In the unified format, configuration paths such as `runtime.cwd`, `runtime.state_dir`, `runtime.logs_dir`, `runtime.env_file` and `tunnel.binary` resolve from the `config.json` directory; relative `history.directory` resolves from the effective workspace. Explicit CLI path overrides remain caller-relative. Legacy split files keep their original path rules.
 
 For example, merge these settings into your local runtime configuration after replacing the paths:
 
 ```json
 {
-  "cwd": "/absolute/path/to/workspace",
-  "shell": "/bin/bash",
+  "schema_version": 1,
+  "runtime": {
+    "cwd": "/absolute/path/to/workspace",
+    "shell": "/bin/bash"
+  },
+  "tools": {
+    "allow": [
+      "exec_command",
+      "write_stdin",
+      "apply_patch",
+      "view_image",
+      "list_exec_sessions",
+      "terminate_exec_session"
+    ]
+  },
   "history": {
     "directory": "/absolute/path/to/private-runtime-history",
     "record_command": false,
@@ -420,7 +439,7 @@ For example, merge these settings into your local runtime configuration after re
 }
 ```
 
-Keep history outside source control. The default `.mcp-dev-runtime/` and `.runtime/` directories are ignored, but an arbitrary custom directory is not automatically covered. One active writer owns each history directory. Do not share it between independent HTTP or stdio instances. Configurations reject unknown keys; the runtime schema is in [contracts/runtime-config.schema.json](contracts/runtime-config.schema.json).
+Keep history outside source control. The default `.mcp-dev-runtime/` and `.runtime/` directories are ignored, but an arbitrary custom directory is not automatically covered. One active writer owns each history directory. Do not share it between independent HTTP or stdio instances. Unified configuration rejects unknown structural keys; [config.example.json](config.example.json) is the public user-facing reference. The older internal runtime schema remains in [contracts/runtime-config.schema.json](contracts/runtime-config.schema.json) for compatibility.
 
 For an outbound proxy, set the appropriate `HTTPS_PROXY`/`HTTP_PROXY` variables in `runtime.env` or the launching environment and set `NO_PROXY=localhost,127.0.0.1,::1`. Do not disable TLS verification as a workaround. Stop and restart after changing environment or connection settings.
 
@@ -436,7 +455,7 @@ npm run down
 npm run up -- --env-file runtime.env --background
 ```
 
-`down` affects only the selected managed instance. With a custom state directory, pass the same `--state-dir` to `up`, `status` and `down`, or keep it in the same launcher configuration. It will not adopt an unrelated listener or kill a process merely because an old PID file names it.
+`down` affects only the selected managed instance. Prefer keeping custom state/log paths in the same unified `config.json`; temporary `--state-dir` overrides still work when supplied consistently. It will not adopt an unrelated listener or kill a process merely because an old PID file names it.
 
 For a **binary upgrade**, follow [the versioned installer and rollback procedure](docs/BINARY_INSTALL.md#upgrade-rollback-and-source-coexistence). Do not run `npm ci` inside a binary installation.
 
@@ -467,7 +486,7 @@ Temporary readiness failures update health instead of rerunning commands; an act
 <a id="logs"></a>
 ## Logs: location, viewing and error investigation
 
-For a launcher-managed installation (`up`), `mdr paths` reports the actual **Logs** directory. Binary packages use `~/Library/Logs/mcp-dev-runtime` on macOS or the user XDG state directory on Linux. Source checkouts retain `.runtime/` beside the source by default. A configured `logs_dir` separates logs from supervisor state; when omitted in an existing source/custom configuration, it falls back to `state_dir`. The table below shows source defaults; use the actual Logs path for a binary installation.
+For a launcher-managed installation (`up`), `mdr paths` reports the actual **Logs** directory. Binary packages use `~/Library/Logs/mcp-dev-runtime` on macOS or the user XDG state directory on Linux. Source checkouts retain `.runtime/` beside the source by default. Unified config uses `runtime.logs_dir` and `runtime.state_dir`; legacy split configs retain `logs_dir/state_dir`. The table below shows source defaults; use the actual Logs path for a binary installation.
 
 | Default path, relative to the installation | Contents |
 | --- | --- |
@@ -502,13 +521,13 @@ grep -nEi -C 3 'error|failed|failure|exception|panic|timeout|timed out|ECONN|EAD
 
 Keyword matching is not an error classifier: no match is not proof of health, and `grep` normally exits with status 1 when nothing matches. A matching word is not automatically a service outage either. Preserve the surrounding context, compare timestamps with the failing operation, and check the current `doctor` result. Use the real state-directory paths below instead of `.runtime/` when customized. Avoid sharing raw `runtime.env` or complete private logs; review/redact paths, command content, Tunnel IDs and secrets first.
 
-**Custom directory:** `logs_dir` in the selected `launcher.config.json` controls log paths; when omitted in a source/custom configuration, logs fall back to `state_dir`. Relative JSON paths resolve from that configuration file, while a CLI `--state-dir` resolves from the caller. Use the same configuration/override for `up`, `status` and `down`. Plain `mcp-dev-runtime status` / `mdr status` shows the resolved log directory; `status --json` includes the absolute MCP/Tunnel filenames in `logs[].file`. Read those paths instead of assuming a custom installation still uses `.runtime/`.
+**Custom directory:** `runtime.logs_dir` and `runtime.state_dir` in unified `config.json` control diagnostics and supervisor state. Relative unified paths resolve from the config file; explicit CLI path overrides resolve from the caller. Legacy launcher files retain their older rules. Plain `mcp-dev-runtime status` / `mdr status` shows the resolved log directory; `status --json` includes absolute component log paths.
 
 For the current source-checkout installation, `.runtime/` is intentionally colocated with the project. Precompiled distributions already keep mutable data outside the installed package tree; `mdr paths` reports the effective layout in both modes.
 
 **Service logs are not command-output history.** When a build, test or shell command fails, inspect its returned `output` and actual `exit_code`, and continue that session with `write_stdin` if necessary. Disk execution history separately defaults to `.mcp-dev-runtime/history/` under the runtime's configured `cwd`; `history.directory` in the runtime configuration can move it elsewhere, for example `.runtime/history/`. Raw tool stdout/stderr is not saved there by default: enable `capture_output: true` when starting a task to preserve its bounded archive. Query it through the [history tools](#history), not by expecting every build's output in `mcp.log`.
 
-MCP and Tunnel diagnostic logs rotate during writes: `log_max_bytes` defaults to 10 MiB and `log_files` defaults to three files per stream, including the current file. These settings are in the launcher configuration. The low-volume background `launcher.log` has separate startup-time rotation. Standalone `npm start` / `serve` output goes to its terminal, and stdio diagnostics to the launching client's stderr; those modes do not create the managed diagnostic files automatically. Logs and history can contain private paths, code or credentials: keep them out of Git and review/redact them before sharing.
+MCP and Tunnel diagnostic logs rotate during writes: unified `logging.max_bytes` defaults to 10 MiB and `logging.files` defaults to three files per stream, including the current file. Legacy launcher configs retain `log_max_bytes/log_files`. The low-volume background `launcher.log` has separate startup-time rotation. Standalone `npm start` / `serve` output goes to its terminal, and stdio diagnostics to the launching client's stderr. Logs and history can contain private paths, code or credentials: keep them out of Git and review/redact them before sharing.
 
 <a id="troubleshooting"></a>
 ## Troubleshooting

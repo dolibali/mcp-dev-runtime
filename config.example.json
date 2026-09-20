@@ -1,16 +1,41 @@
 {
-  "transport": "http",
-  "host": "127.0.0.1",
-  "port": 3001,
-  "cwd": ".",
-  "shell": "/bin/bash",
-  "log_level": "info",
+  "schema_version": 1,
+  "mcp": {
+    "transport": "http",
+    "host": "127.0.0.1",
+    "port": 3001,
+    "path": "/mcp",
+    "health_path": "/healthz"
+  },
+  "tunnel": {
+    "enabled": true,
+    "health_port": 9098,
+    "ready_timeout_ms": 30000,
+    "health_interval_ms": 5000
+  },
+  "tools": {
+    "allow": [
+      "exec_command",
+      "write_stdin",
+      "apply_patch",
+      "view_image",
+      "list_exec_sessions",
+      "terminate_exec_session"
+    ]
+  },
+  "runtime": {
+    "cwd": ".",
+    "shell": "/bin/bash",
+    "state_dir": ".runtime",
+    "logs_dir": ".runtime",
+    "env_file": "runtime.env",
+    "shell_env": false
+  },
   "exec": {
     "retained_session_ms": null,
     "max_ended_sessions": 512,
     "maintenance_interval_ms": 30000
   },
-  "request_cache_ttl_ms": 600000,
   "history": {
     "enabled": true,
     "directory": ".mcp-dev-runtime/history",
@@ -20,5 +45,13 @@
     "max_total_bytes": 268435456,
     "max_log_bytes": 16777216,
     "max_pending_bytes": 1048576
+  },
+  "logging": {
+    "level": "info",
+    "max_bytes": 10485760,
+    "files": 3
+  },
+  "request_cache": {
+    "ttl_ms": 600000
   }
 }

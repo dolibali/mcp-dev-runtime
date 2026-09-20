@@ -4,6 +4,7 @@
   "description": "Local development tools over MCP: shell, terminal sessions, patches and images. No agent or model calls.",
   "scripts": {
     "setup": "bash ./install.sh",
+    "uninstall": "bash ./uninstall.sh",
     "command:install": "node scripts/global-command.mjs",
     "command:uninstall": "node scripts/global-command.mjs --remove",
     "build": "tsc -p tsconfig.json",
@@ -64,10 +65,13 @@
   },
   "files": [
     "install.sh",
+    "uninstall.sh",
     "dist",
     "contracts",
     "scripts/setup.mjs",
     "scripts/global-command.mjs",
+    "scripts/uninstall.mjs",
+    "scripts/uninstall-lib.mjs",
     "scripts/prepare-pty.mjs",
     "README.md",
     "docs",

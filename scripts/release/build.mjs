@@ -54,15 +54,16 @@ try {
   await cp(path.join(root, 'dist'), path.join(app, 'dist'), { recursive: true });
   for (const file of ['contracts', 'tunnel.lock.json']) await cp(path.join(root, file), path.join(app, file), { recursive: true });
   for (const file of ['doctor.mjs', 'smoke.mjs', 'verify-deployed.mjs']) await cp(path.join(root, 'scripts', file), path.join(app, 'scripts', file));
-  for (const file of ['bundle-lib.mjs', 'install.mjs']) await cp(path.join(root, 'scripts', 'release', file), path.join(app, 'scripts', 'release', file));
+  for (const file of ['bundle-lib.mjs', 'install.mjs', 'uninstall.mjs']) await cp(path.join(root, 'scripts', 'release', file), path.join(app, 'scripts', 'release', file));
+  await cp(path.join(root, 'scripts', 'uninstall-lib.mjs'), path.join(app, 'scripts', 'uninstall-lib.mjs'));
   for (const file of ['README.md', 'LICENSE', 'NOTICE', 'THIRD_PARTY_NOTICES.md', 'SECURITY.md', 'docs']) await cp(path.join(root, file), path.join(bundle, file), { recursive: true });
   await mkdir(path.join(bundle, 'reference', 'codex'), { recursive: true });
   for(const file of ['LICENSE','SOURCE.json'])await cp(path.join(root,'reference','codex',file),path.join(bundle,'reference','codex',file));
   // The archive landing page is for end users, not the source-build workflow.
   await writeFile(path.join(bundle, 'README.md'), '# MCP Dev Runtime ' + pkg.version + '\n\n' +
     '[English installation](docs/BINARY_INSTALL.md) | [简体中文安装](docs/BINARY_INSTALL.zh-CN.md)\n\n' +
-    'This precompiled package includes its own Node runtime, native dependencies and pinned Tunnel. Verify the release SHA256SUMS, then run `./install.sh` without sudo. Publisher signing and Apple notarization are deliberately skipped.\n\n' +
-    '运行包已内置 Node、原生依赖及固定版本 Tunnel。先核对 Release 的 SHA256SUMS，再执行 `./install.sh`，不需要 sudo 或编译器。本版暂不进行发布者签名和 Apple 公证。\n\n' +
+    'This precompiled package includes its own Node runtime, native dependencies and pinned Tunnel. Verify the release SHA256SUMS, then run `./install.sh` without sudo. Use `./uninstall.sh` for a complete interactive uninstall. Publisher signing and Apple notarization are deliberately skipped.\n\n' +
+    '运行包已内置 Node、原生依赖及固定版本 Tunnel。先核对 Release 的 SHA256SUMS，再执行 `./install.sh`，不需要 sudo 或编译器。完整卸载使用 `./uninstall.sh` 并按提示确认。本版暂不进行发布者签名和 Apple 公证。\n\n' +
     '[ChatGPT setup](docs/CHATGPT_SETUP.md) | [ChatGPT 图文教程](docs/CHATGPT_SETUP.zh-CN.md)\n');
   // Any source-only relative documentation link points to the immutable release source instead.
   async function resolveDocLinks(dir) {
@@ -162,6 +163,10 @@ try {
     `case "$(uname -s):$(uname -m)" in ${process.platform === 'darwin' ? 'Darwin' : 'Linux'}:${process.arch === 'arm64' ? (process.platform === 'darwin' ? 'arm64' : 'aarch64|Linux:arm64') : 'x86_64'}) ;; *) echo "Wrong platform/architecture. Download ${id}." >&2; exit 1;; esac\n` +
     'exec "$ROOT/runtime/node" "$ROOT/app/scripts/release/install.mjs" "$@"\n';
   await writeFile(path.join(bundle, 'install.sh'), install, { mode: 0o755 });
+  const uninstall = '#!/bin/sh\nset -eu\nROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\n' +
+    `case "$(uname -s):$(uname -m)" in ${process.platform === 'darwin' ? 'Darwin' : 'Linux'}:${process.arch === 'arm64' ? (process.platform === 'darwin' ? 'arm64' : 'aarch64|Linux:arm64') : 'x86_64'}) ;; *) echo "Wrong platform/architecture. Use the uninstaller from the installed MDR directory." >&2; exit 1;; esac\n` +
+    'exec "$ROOT/runtime/node" "$ROOT/app/scripts/release/uninstall.mjs" "$@"\n';
+  await writeFile(path.join(bundle, 'uninstall.sh'), uninstall, { mode: 0o755 });
   // SPDX inventory: production npm packages + Node + the pinned Tunnel.
   const npmLock = JSON.parse(await readFile(path.join(root, 'package-lock.json'), 'utf8'));
   const packages = [];

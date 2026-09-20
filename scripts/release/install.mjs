@@ -1,4 +1,4 @@
-import { cp, lstat, mkdir, readFile, readlink, realpath, rename, rm, symlink, unlink, writeFile, access, link } from 'node:fs/promises';
+import { cp, lstat, mkdir, readFile, readlink, realpath, rename, rm, symlink, unlink, writeFile, access, link, chmod } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import path from 'node:path';
 import { homedir } from 'node:os';
@@ -65,6 +65,43 @@ async function register(name) {
   } finally { await unlink(temporary).catch(e => { if (e.code !== 'ENOENT') throw e; }); }
   console.log('Registered: ' + destination);
 }
+async function installStableUninstaller() {
+  const destination = path.join(l.config_dir, 'uninstall.sh');
+  const uninstallHeader = '#!/bin/sh\n# mcp-dev-runtime binary uninstaller v1\n# install-prefix: ' + Buffer.from(prefix).toString('base64') + '\n';
+  const text = uninstallHeader + 'set -eu\nexec ' +
+    shellQuote(path.join(prefix, 'current', 'runtime', 'node')) + ' ' +
+    shellQuote(path.join(prefix, 'current', 'app', 'scripts', 'release', 'uninstall.mjs')) +
+    ' --prefix ' + shellQuote(prefix) + ' --bin-dir ' + shellQuote(bin) + ' "$@"\n';
+  const current = await existing(destination);
+  let before = null;
+  if (current) {
+    if (!current.isFile() || current.isSymbolicLink() || current.uid !== process.getuid()) {
+      throw new Error('Refusing to replace unrelated uninstaller: ' + destination);
+    }
+    const prior = await readFile(destination, 'utf8');
+    if (!prior.startsWith('#!/bin/sh\n# mcp-dev-runtime binary uninstaller v1\n')) {
+      throw new Error('Refusing to replace unrelated uninstaller: ' + destination);
+    }
+    before = current;
+  }
+  const temporary = destination + '.tmp-' + randomUUID();
+  try {
+    await writeFile(temporary, text, { flag: 'wx', mode: 0o700 });
+    await chmod(temporary, 0o700);
+    if (before) {
+      const now = await lstat(destination);
+      if (!now.isFile() || now.isSymbolicLink() || before.dev !== now.dev || before.ino !== now.ino ||
+          before.mtimeMs !== now.mtimeMs || before.size !== now.size) {
+        throw new Error('Uninstaller changed during installation; refusing replacement: ' + destination);
+      }
+      await rename(temporary, destination);
+    } else {
+      await link(temporary, destination); // Exclusive: never overwrite a concurrently created file.
+      await unlink(temporary);
+    }
+  } finally { await unlink(temporary).catch(e => { if (e.code !== 'ENOENT') throw e; }); }
+  console.log('Uninstaller: ' + destination);
+}
 if (values.unregister) {
   for (const name of ['mcp-dev-runtime', 'mdr']) {
     const file = path.join(bin, name);
@@ -115,6 +152,7 @@ try {
   const nextLink = path.join(prefix, '.current-' + randomUUID());
   try { await symlink(versionDir, nextLink); await rename(nextLink, currentLink); }
   finally { await unlink(nextLink).catch(e => { if (e.code !== 'ENOENT') throw e; }); }
+  await installStableUninstaller();
   if (!values['no-global-command']) {
     await mkdir(bin, { recursive: true });
     await register('mcp-dev-runtime');
@@ -133,6 +171,7 @@ try {
   }
   console.log('Installed: ' + destination);
   console.log('Configuration preserved; fill missing credentials locally in: ' + config.env_file);
+  console.log('Complete uninstall: ' + path.join(l.config_dir, 'uninstall.sh'));
   console.log('Run: ' + shellQuote(path.join(destination, 'bin', 'mcp-dev-runtime')) + ' doctor --offline');
   console.log('Then: mcp-dev-runtime up --background');
   console.log('Publisher signing/notarization: SKIPPED. Verify SHA256SUMS from the release before running.');

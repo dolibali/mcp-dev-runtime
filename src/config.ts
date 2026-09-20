@@ -4,6 +4,8 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import * as z from 'zod/v4';
 import { ToolError } from './runtime/errors.js';
+import { defaultToolAllowlist, validateToolAllowlist } from './mcp/tool-registry.js';
+import { isUnifiedUserConfig, runtimeConfigFromUnified } from './user-config.js';
 
 const integer = (min: number, max: number, fallback: number) => z.number().int().min(min).max(max).default(fallback);
 export const configSchema = z.strictObject({
@@ -37,6 +39,9 @@ export const configSchema = z.strictObject({
     max_log_bytes: integer(1024, 268435456, 16777216),
     max_pending_bytes: integer(1024, 16777216, 1048576)
   }).prefault({}),
+  tools: z.strictObject({
+    allow: z.array(z.string().min(1)).default([...defaultToolAllowlist])
+  }).prefault({}),
   image: z.strictObject({
     max_encoded_bytes: integer(1024, 33554432, 8388608),
     max_input_bytes: integer(1024, 134217728, 33554432),
@@ -67,10 +72,17 @@ export async function validateConfig(config: Config): Promise<Config> {
   if (config.mcp_path === config.health_path) throw new Error('mcp_path and health_path must differ.');
   if (config.exec.default_yield_time_ms > config.exec.max_yield_time_ms ||
       config.exec.default_max_output_tokens > config.exec.max_output_tokens) throw new Error('Default budget exceeds configured maximum.');
+  config.tools.allow = validateToolAllowlist(config.tools.allow);
   return config;
 }
 export async function loadConfig(filename?: string, overrides: Record<string, unknown> = {}): Promise<Config> {
-  const fromFile = filename ? JSON.parse(await readFile(filename, 'utf8')) : {};
+  const raw = filename ? JSON.parse(await readFile(filename, 'utf8')) : {};
+  const fromFile = isUnifiedUserConfig(raw) ? runtimeConfigFromUnified(raw) : raw;
+  if (filename && isUnifiedUserConfig(raw)) {
+    const base = path.dirname(path.resolve(filename));
+    if (typeof fromFile.cwd === 'string') fromFile.cwd = expandPath(fromFile.cwd, base);
+    if (typeof fromFile.shell === 'string') fromFile.shell = expandPath(fromFile.shell, base);
+  }
   // Resolve a missing cwd at invocation time, not when the schema was imported.
   return validateConfig(configSchema.parse({ cwd: process.cwd(), ...fromFile, ...overrides }));
 }

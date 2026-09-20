@@ -83,6 +83,8 @@ macOS 上需要本地编译依赖时，可用 `xcode-select --install` 安装 Xc
 
 **推荐：**下载[预编译发行版](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.0.0)，核对 SHA-256、解压并运行其中的 `./install.sh`。[预编译指南](BINARY_INSTALL.zh-CN.md)说明用户目录、命令、共存、升级和回退；这个安装器不编译或下载依赖。
 
+**当前开发分支：**完整卸载统一使用 `./uninstall.sh`。脚本会先列出所有准备删除的 MDR 自有路径，只有用户明确输入 `y` 才继续。已经正式发布且不可修改的 v1.0.0 压缩包早于这个功能，因此其中仍只有命令入口级的 `./install.sh --unregister`；下一个预编译版本会在安装时把稳定的 `uninstall.sh` 保存到用户目录，不需要长期保留下载解压目录。
+
 ### 源码开发替代方式
 
 使用下面的地址克隆仓库；私有仓库需要使用具有访问权限的账号。使用 Fork 时，改为该 Fork 的克隆地址。如果使用下载后解压的源码包，跳过克隆，进入解压后的项目目录即可。
@@ -93,7 +95,7 @@ cd mcp-dev-runtime
 ./install.sh
 ```
 
-这个安装过程是本地执行、可重复运行的：安装锁文件指定的 npm 依赖、编译运行时、仅在文件不存在时创建 `config.json`、`launcher.config.json` 和 `runtime.env`，然后验证已有 Tunnel，或按 `tunnel.lock.json` 的精确提交拉取源码并构建 `tunnel-client-runtime` 到被忽略的 `.runtime/bin/<commit>/`。脚本不会自动运行 `sudo`、Homebrew 或 apt，也不会覆盖已有本地配置和凭据。
+这个安装过程是本地执行、可重复运行的：新安装只在缺失时创建**一份非敏感 `config.json` + 私有 `runtime.env`**，然后验证已有 Tunnel，或按 `tunnel.lock.json` 的精确提交拉取源码并构建 `tunnel-client-runtime` 到被忽略的 `.runtime/bin/<commit>/`。已有的旧版 `launcher.config.json + config.json` 会继续兼容读取，安装器不会自动迁移或覆盖。脚本不会自动运行 `sudo`、Homebrew 或 apt。
 
 只需要本地 HTTP / stdio、不接 ChatGPT Tunnel 时，可以跳过 Tunnel：
 
@@ -105,14 +107,14 @@ cd mcp-dev-runtime
 
 重复运行时，脚本通过被忽略的 `.runtime/setup/` 中的 package-lock 哈希判断是否需要再次执行 `npm ci`。如果确实需要刷新依赖，同时检测到受管服务仍可能在运行，安装器会拒绝在活动服务下面替换 `node_modules`；应先停止自己管理的活动任务，而不是强行覆盖。
 
-从仓库根目录启动时，示例配置可以直接使用。需要操作其他项目时，编辑 `config.json`，将 `cwd` 设为**已经存在的工作目录绝对路径**。它只是默认目录，不是文件访问白名单。多个项目共用一个运行时，建议单独设置绝对的 `history.directory`，详见[配置说明](#configuration)。
+从仓库根目录启动时，示例配置可以直接使用。需要操作其他项目时，编辑 `config.json` 的 `runtime.cwd`。统一配置中的路径以 `config.json` 所在目录为基准；`history.directory` 仍以最终工作目录为基准。工作目录只是默认目录，不是文件访问白名单。
 
 源码编译需要开发依赖，安装过程还会准备当前项目的原生 PTY 辅助程序；当前平台没有适用预编译包时仍可能需要前面的系统编译依赖。`package.json` 中的 `private: true` 是为了防止误发到 **npm**，不妨碍在 GitHub 公开源码。不要假定运行 `npx mcp-dev-runtime` 就能安装到本项目。
 
 <a id="global-command"></a>
 ### 在任意目录使用全局命令
 
-两种安装方式提供同样的 CLI。预编译版使用内置 Node 和用户级配置；下面的 `npm run command:*` 说明专用于源码 checkout。预编译版移除入口使用 `./install.sh --unregister`，并保留原来的 prefix/bin 参数，见[预编译安装](BINARY_INSTALL.zh-CN.md)。
+两种安装方式提供同样的 CLI。预编译版使用内置 Node 和用户级配置；下面的 `npm run command:*` 说明专用于源码 checkout。当前开发分支完整卸载使用 `./uninstall.sh`；v1.0.0 仍保留原有的命令入口级 `./install.sh --unregister`。见[预编译安装](BINARY_INSTALL.zh-CN.md)。
 
 安装成功后，会在 `~/.local/bin/mcp-dev-runtime` 注册**当前用户的全局命令**。安装器还会自动尝试注册短命令 `mdr`；如果这个名字已被其他程序占用，只跳过短命令，不影响整个安装成功。两个入口都仍使用同一份源码、Node 程序、Tunnel 缓存和配置，不会复制第二套运行时，也不需要 `sudo`。注册后不要删除源码目录或对应 Node 安装。
 
@@ -140,13 +142,15 @@ mdr status
 mdr status --verbose
 mdr status --json
 mdr paths
+mdr config
+mdr tools
 ```
 
 普通 `status` 是日常查看用的简洁摘要；`--verbose` 会补充进程 PID、实例 ID、延迟、内存、保留会话 / 历史大小以及 Tunnel 版本；`--json` 保留完整的机器可读 supervisor 对象，适合脚本和深度排障。长命令 `mcp-dev-runtime` 支持同样参数；通过 npm 使用时写成 `npm run status -- --json` 或 `npm run status -- --verbose`。
 
-`mdr paths` 只显示当前这份安装真正解析并使用的路径，不预览假设中的未来目录，也不会迁移任何文件。源码版与预编译版均通过同一个命令显示实际生效的路径。需要机器可读结果时用 `mdr paths --json`。
+`mdr paths` 只显示实际路径；`mdr config` 显示实际生效的**非敏感配置**；`mdr tools` 显示工具启用状态。它们都不会输出 `runtime.env` 内容。需要机器可读结果时加 `--json`。
 
-为了每次启动不用重新填写凭据文件路径，把 `"env_file": "runtime.env"` 合并到**已有的** `launcher.config.json` 中，保留其他设置；这个值是文件名，不是 API Key。之后在任意目录都可以运行 `mcp-dev-runtime up --background` 和 `mcp-dev-runtime down`。显式传入 `--env-file FILE` 时，相对路径按终端当前目录解析，必要时使用绝对路径。注册命令本身不读取或修改 `runtime.env`，也不启动或停止服务。
+新的统一配置已经通过 `runtime.env_file` 指向同目录的 `runtime.env`，因此无需每次传凭据文件路径。已有旧版 launcher 配置继续保持原来的 `env_file` 语义。显式 `--env-file FILE` 仍可作临时覆盖，并按调用终端目录解析。注册命令本身不读取或修改 `runtime.env`。
 
 管理命令读取安装目录的配置，并以该安装目录作为工作目录解析基准，不会误用当前其他项目里的同名文件。显式路径参数仍相对于调用目录。`mcp-dev-runtime serve` 则保留终端当前目录，供本地 HTTP / stdio 使用。全局 `smoke` 会根据选中的配置生成目标 URL；旧的 `npm run smoke` 在非默认端口时仍需显式传入 URL。
 
@@ -158,7 +162,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 把这行加入对应 Shell 的启动文件，可以让后续终端也生效；安装器**不会擅自修改** `.zshrc`、`.bashrc` 等文件。同名但不属于本项目的命令不会被覆盖；PATH 中有优先命令时会明确提示。入口使用注册时选定的 Node；主动删除或迁移该 Node 版本后，应使用兼容的新 Node 重新注册。
 
-只移除当前源码目录注册的命令，可在仓库中运行 `npm run command:uninstall`，不会删除配置、Tunnel、历史或停止服务。迁移源码目录前先移除入口，再从新位置注册；安装器不会默默把旧入口改指向另一份源码。高级安装可以指定 `npm run command:install -- --bin-dir /absolute/path/to/bin`，卸载时使用相同的 `--bin-dir`。CI 或嵌入式部署不需要全局入口时，用 `./install.sh --no-global-command` 跳过注册。
+只移除当前源码目录注册的命令，可在仓库中运行 `npm run command:uninstall`，不会删除配置、Tunnel、历史或停止服务。需要**完整卸载源码版**时运行 `./uninstall.sh`：明确输入 `y` 后会安全停止该 checkout 自己管理的实例，删除它拥有的命令、本地配置/凭据、运行状态/历史、`dist` 和 `node_modules`，但绝不会自动删除 Git 仓库本身。迁移源码目录前先移除入口，再从新位置注册；安装器不会默默把旧入口改指向另一份源码。高级安装可以指定 `npm run command:install -- --bin-dir /absolute/path/to/bin`，卸载时使用相同的 `--bin-dir`。CI 或嵌入式部署不需要全局入口时，用 `./install.sh --no-global-command` 跳过注册。
 
 <a id="short-command"></a>
 #### 短命令：`mdr`
@@ -287,7 +291,7 @@ CONTROL_PLANE_API_KEY=replace-with-your-own-runtime-key
 
 已经导出的非空凭据环境变量优先于 env 文件。`runtime.env` 按数据解析，不展开 `$HOME`，不执行 `source` 或命令替换。启动器会从 MCP 子进程环境中移除控制面密钥，但这不是安全沙箱。
 
-可在 `launcher.config.json` 中加入 `"env_file": "runtime.env"`，这样后续启动可以省略 `--env-file`。自定义 `tunnel_bin` 也可写入该文件；其中的相对路径以配置文件所在目录为基准。
+统一配置已经通过 `runtime.env_file` 关联 `runtime.env`；自定义 Tunnel 二进制使用 `tunnel.binary`。真实密钥只放在 `runtime.env`，不要写入 JSON。
 
 ### 第 4 步：启动并验证
 
@@ -297,7 +301,7 @@ npm run doctor
 npm run smoke
 ```
 
-预期 `doctor` 显示 `PASS`，其中 `runtime.ok`、`protocol.ok` 为 true，对应受管实例的 `health.availability` 为 `ready`。还应检查各项工具链结果和历史存储告警。从本仓库运行时，`doctor` 会根据 `launcher.config.json` 选择运行时配置；未指定时，会使用本仓库已存在的 `config.json`。检查其他安装位置时，使用 `-- --config FILE` 或 `-- --launcher-config FILE` 明确指定。`smoke` 另外对默认端点执行一次无害命令。这些仍是**本地检查**，不能替代 ChatGPT 到电脑的一次真实调用。
+预期 `doctor` 显示 `PASS`，其中 `runtime.ok`、`protocol.ok` 为 true，对应受管实例的 `health.availability` 为 `ready`。新模式下 `doctor` 和生命周期命令统一使用 `--config FILE`；`--launcher-config FILE` 仅作为旧 split 配置兼容入口。`smoke` 会按当前 `tools.allow` 校验工具发现，并在执行相关工具启用时运行一次无害命令。这些仍是**本地检查**。
 
 需要查看生命周期详情时运行 `npm run status`。两条原始 `curl` 探测保留为可选的分层排障手段，不再作为额外必做步骤；见[端口与直接探测](DEPLOYMENT.md#ports)。
 
@@ -390,36 +394,49 @@ npm run smoke
 
 | 文件 | 用途 | 是否提交 Git |
 | --- | --- | --- |
-| `config.example.json` | 公共运行时默认配置 | 是 |
-| `config.json` | 你本机的运行时设置和路径 | 否 |
-| `launcher.config.example.json` | 公共启动器默认配置 | 是 |
-| `launcher.config.json` | 本机运行时配置路径、状态目录、可选程序与 env 路径 | 否 |
+| `config.example.json` | 公共统一配置：MCP / Tunnel / 工具 / 运行目录等 | 是 |
+| `config.json` | 你本机唯一的非敏感 MDR 配置 | 否 |
+| `launcher.config.example.json` | 旧 split 配置兼容示例 | 是 |
+| `launcher.config.json` | 已有旧版启动器配置；新安装不再创建 | 否 |
 | `.env.example` | 凭据占位符和代理示例 | 是，仅含占位值 |
 | `runtime.env` | 真实运行凭据 | **禁止** |
 | `tunnel.lock.json` | 公共版本与源码提交绑定 | 是 |
+
+统一配置按 `mcp`、`tunnel`、`tools`、`runtime`、`exec`、`history`、`logging`、`request_cache` 分组。`tools.allow` 采用 fail-closed：只有明确列出的工具才会注册并允许调用。当前默认仍是既有 6 个稳定工具；以后实验工具即使已经实现，只要不加入默认 allowlist 就不会对普通用户暴露。未知、重复和 `*` 工具名都会被拒绝。
 
 <a id="ports"></a>
 ### 默认端口
 
 | 监听服务 | 默认地址 | 确有需要时修改的字段 |
 | --- | --- | --- |
-| 本地 MCP，包含 `/mcp` 和 `/healthz` | `127.0.0.1:3001` | `config.json` 顶层的 `port` |
-| Tunnel 健康检查，包含 `/readyz` | `127.0.0.1:9098` | `launcher.config.json` 中的 `tunnel_health_port` |
+| 本地 MCP，包含 `/mcp` 和 `/healthz` | `127.0.0.1:3001` | `config.json` 的 `mcp.port` |
+| Tunnel 健康检查，包含 `/readyz` | `127.0.0.1:9098` | `config.json` 的 `tunnel.health_port` |
 
 这是可配置的项目默认值，不是专门为本项目保留的端口，也不保证永远没有冲突。已经正常工作的安装可以保持不变。出现冲突时，只停止已确认归属的重复实例，或选择未占用且互不相同的本地端口；不要用改成 `0.0.0.0` 监听或开放公网防火墙端口的方式处理。换端口本身不是安全措施。
 
-先检查活动任务，再停止服务、修改已有本地 JSON 字段，并使用同一启动器配置重启。受管启动器会根据运行时配置生成 MCP 转发地址；修改这些本地端口不改变 Tunnel ID。直接 HTTP 客户端的 URL 需要同步更新，`smoke` / `verify:deployed` 也要显式传入新 URL，它们不会自动读取 `config.json`。只改 `curl` 命令里的地址不会改变服务端口。详细步骤见[端口调整说明](DEPLOYMENT.md#ports)。
+先检查活动任务，再停止服务、修改同一份 `config.json` 并重启。Launcher 会从 `mcp.*` 自动生成 Tunnel 转发地址；修改本地端口不改变 Tunnel ID。全局 `mdr smoke` 会跟随选中的配置；低层 URL 验证工具仍需使用实际端点。
 
-运行时命令行参数优先于运行时 JSON。运行时 `cwd` 相对**进程启动目录**解析，不相对 JSON 文件所在目录；相对的 `history.directory` 再以解析后的 `cwd` 为基准。
-
-启动器 JSON 中的相对路径，以**启动器配置文件所在目录**为基准；命令行路径覆盖项则以执行命令的终端目录为基准。部署时建议使用绝对的工作目录和历史目录。
+命令行参数优先于 JSON。统一格式中的 `runtime.cwd`、`runtime.state_dir`、`runtime.logs_dir`、`runtime.env_file`、`tunnel.binary` 等配置路径以 **`config.json` 所在目录**为基准；相对 `history.directory` 以最终工作目录为基准。命令行路径覆盖项仍以执行命令的终端目录为基准。旧 split 配置继续保留原路径语义。
 
 例如，替换真实路径后，将以下设置合并进本地运行时配置：
 
 ```json
 {
-  "cwd": "/absolute/path/to/workspace",
-  "shell": "/bin/bash",
+  "schema_version": 1,
+  "runtime": {
+    "cwd": "/absolute/path/to/workspace",
+    "shell": "/bin/bash"
+  },
+  "tools": {
+    "allow": [
+      "exec_command",
+      "write_stdin",
+      "apply_patch",
+      "view_image",
+      "list_exec_sessions",
+      "terminate_exec_session"
+    ]
+  },
   "history": {
     "directory": "/absolute/path/to/private-runtime-history",
     "record_command": false,
@@ -428,7 +445,7 @@ npm run smoke
 }
 ```
 
-历史不要进入源码管理。默认的 `.mcp-dev-runtime/` 和 `.runtime/` 已被忽略，但任意自定义目录不会自动获得相同保护。每个历史目录只能有一个活动写入者，独立 HTTP、stdio 实例不能共用。配置拒绝未知字段，完整运行时 Schema 见 [contracts/runtime-config.schema.json](../contracts/runtime-config.schema.json)。
+历史不要进入源码管理。默认的 `.mcp-dev-runtime/` 和 `.runtime/` 已被忽略，但任意自定义目录不会自动获得相同保护。每个历史目录只能有一个活动写入者。用户侧统一配置以 [config.example.json](../config.example.json) 为参考；旧的内部 runtime schema 继续用于兼容。
 
 使用出站代理时，可在 `runtime.env` 或启动环境中设置合适的 `HTTPS_PROXY`/`HTTP_PROXY`，并设置 `NO_PROXY=localhost,127.0.0.1,::1`。不要用关闭 TLS 校验来解决证书问题。环境变量和连接设置变更后，应停止再启动服务。
 
@@ -444,7 +461,7 @@ npm run down
 npm run up -- --env-file runtime.env --background
 ```
 
-`down` 只操作选中的受管实例。使用自定义状态目录时，`up`、`status`、`down` 都应传入相同的 `--state-dir`，或统一使用同一份启动器配置。它不会接管无关监听服务，也不会仅凭旧 PID 文件就结束某个系统进程。
+`down` 只操作选中的受管实例。建议把自定义 state/log 路径都写在同一份统一 `config.json`；临时 `--state-dir` 覆盖仍需在生命周期命令间保持一致。它不会接管无关监听服务。
 
 **预编译版升级**使用[版本目录安装与回退流程](BINARY_INSTALL.zh-CN.md#升级回退与源码版共存)，不要在运行包里执行 `npm ci`。
 
@@ -475,7 +492,7 @@ node dist/launcher/cli.js history-clear --config config.json --confirm
 <a id="logs"></a>
 ## 日志目录、查看方法与错误排查
 
-通过启动器 `up` 管理的服务，用 `mdr paths` 查看真实的 **Logs** 目录。预编译版在 macOS 使用 `~/Library/Logs/mcp-dev-runtime`，Linux 使用用户 XDG 状态目录；源码版默认仍是源码旁的 `.runtime/`。`logs_dir` 可将日志与 supervisor 状态分离；旧源码或自定义配置未指定时仍沿用 `state_dir`。下表是源码默认路径，预编译版应使用实际显示的 Logs 路径。
+通过 `up` 管理的服务，用 `mdr paths` 查看真实 **Logs** 目录。预编译版在 macOS 使用 `~/Library/Logs/mcp-dev-runtime`，Linux 使用用户 XDG 状态目录；源码版默认仍是源码旁的 `.runtime/`。统一配置使用 `runtime.logs_dir` / `runtime.state_dir`；旧 split 配置继续兼容原字段。
 
 | 默认路径，相对于安装目录 | 内容 |
 | --- | --- |
@@ -510,13 +527,13 @@ grep -nEi -C 3 'error|failed|failure|exception|panic|timeout|timed out|ECONN|EAD
 
 关键词搜索不是错误判定器：没有命中不代表服务健康，`grep` 没有匹配时正常返回退出码 1；命中一个词也不一定代表服务不可用。保留前后上下文，对照出错操作的时间和当前 `doctor` 结果。改过状态目录时，使用下面说明的实际路径，不要继续照抄 `.runtime/`。不要直接分享 `runtime.env` 或完整私人日志，先检查并脱敏路径、命令内容、Tunnel ID 和秘密值。
 
-**改过目录时：**所选 `launcher.config.json` 的 `logs_dir` 决定日志路径；源码或自定义配置未指定时，日志仍沿用 `state_dir`。JSON 中的相对路径以该配置文件为基准，命令行 `--state-dir` 的相对路径以调用目录为基准。`up`、`status`、`down` 要使用相同的配置或覆盖项。普通 `mcp-dev-runtime status` / `mdr status` 会显示解析后的日志目录；`status --json` 会在 `logs[].file` 中给出 MCP / Tunnel 日志的绝对路径。自定义安装应以这些实际路径为准，不能继续假定是 `.runtime/`。
+**改过目录时：**统一 `config.json` 的 `runtime.logs_dir` / `runtime.state_dir` 决定日志和状态路径；相对路径以配置文件为基准，命令行覆盖仍以调用目录为基准。旧 launcher 文件继续保留旧规则。普通 `status` 会显示解析后的日志目录，`status --json` 给出组件日志绝对路径。
 
 当前源码 checkout 有意把 `.runtime/` 放在项目目录中。预编译版已经把可变数据放在程序目录外，`mdr paths` 在两种模式下都只显示实际生效的目录。
 
 **服务日志不等于命令输出历史。**构建、测试或 Shell 命令失败时，应查看工具返回的 `output` 和真实 `exit_code`，必要时用 `write_stdin` 继续读取该会话。磁盘执行历史默认在运行时配置的 `cwd` 下的 `.mcp-dev-runtime/history/`；运行时配置中的 `history.directory` 可以将其改到其他位置，例如 `.runtime/history/`。默认不保存工具的原始 stdout/stderr，需要保留某次构建日志时，在启动任务时设置 `capture_output: true`，再通过[历史工具](#history)查询有容量上限的档案，而不是到 `mcp.log` 中找每一条构建输出。
 
-MCP 与 Tunnel 的诊断日志按写入量轮转：启动器配置的 `log_max_bytes` 默认 10 MiB，`log_files` 默认每条日志流保留三份，包含当前文件。低频的后台 `launcher.log` 单独在启动时轮转。独立 `npm start` / `serve` 的输出在对应终端，stdio 诊断在启动客户端的 stderr；这些方式不会自动生成受管服务的日志文件。日志和历史可能包含私人路径、代码或凭据，不应提交 Git，分享前需要审阅并脱敏。
+MCP 与 Tunnel 的诊断日志按写入量轮转：统一配置的 `logging.max_bytes` 默认 10 MiB，`logging.files` 默认每条日志流保留三份；旧 launcher 配置继续兼容 `log_max_bytes/log_files`。低频的后台 `launcher.log` 单独在启动时轮转。独立 `npm start` / `serve` 的输出在对应终端，stdio 诊断在启动客户端的 stderr。日志和历史可能包含私人路径、代码或凭据，不应提交 Git，分享前需要审阅并脱敏。
 
 <a id="troubleshooting"></a>
 ## 常见问题
