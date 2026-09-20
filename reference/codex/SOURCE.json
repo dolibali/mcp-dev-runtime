@@ -1,0 +1,14 @@
+{
+  "repo": "https://github.com/openai/codex",
+  "commit": "78245b47af2a7aafcabe025828ceecca69db4df1",
+  "files": [
+    "LICENSE",
+    "codex-rs/core/src/tools/handlers/shell_spec.rs",
+    "codex-rs/core/src/tools/handlers/unified_exec/write_stdin.rs",
+    "codex-rs/core/src/tools/handlers/apply_patch_spec.rs",
+    "codex-rs/core/assets/tools/apply_patch.lark",
+    "codex-rs/apply-patch/src/parser.rs",
+    "codex-rs/apply-patch/src/seek_sequence.rs",
+    "codex-rs/apply-patch/src/lib.rs"
+  ]
+}

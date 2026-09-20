@@ -1,0 +1,2134 @@
+{
+  "tools": [
+    {
+      "name": "exec_command",
+      "description": "Execute a command on the host using a shell. Ordinary commands use pipes; tty=true provides interactive PTY input. Return output, state and a session_id; continue running commands with write_stdin instead of launching them again. Files, search, Git, builds and tests are available through installed commands. No Codex agent or model is called. Read the command output from the output field in structuredContent; the same chunk is also available in text content. Optional label identifies a task. Set capture_output=true for bounded disk logs that remain queryable after memory eviction or restart. History metadata is persisted by default; command text and raw output are not persisted by default.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cmd": {
+            "type": "string",
+            "description": "Shell command to execute.",
+            "minLength": 1
+          },
+          "workdir": {
+            "type": "string",
+            "description": "Working directory. Relative values resolve against the fixed server cwd; omitted uses that cwd.",
+            "minLength": 1
+          },
+          "shell": {
+            "type": "string",
+            "description": "Optional absolute shell executable path; omitted uses the shell resolved at server startup.",
+            "minLength": 1
+          },
+          "login": {
+            "type": "boolean",
+            "description": "Use a login shell. False avoids loading login startup files for each command.",
+            "default": false
+          },
+          "tty": {
+            "type": "boolean",
+            "description": "Allocate a PTY when input or terminal semantics are required. Otherwise stdin is closed and output uses pipes.",
+            "default": false
+          },
+          "yield_time_ms": {
+            "type": "integer",
+            "description": "Maximum wait for this initial response, not a process timeout. Completed commands return immediately; a still-running command returns when this wait expires.",
+            "minimum": 0,
+            "maximum": 10000,
+            "default": 1000
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "description": "Approximate text budget: at most min(4 * value, 65536) UTF-8 bytes. Not an exact model token count.",
+            "minimum": 256,
+            "maximum": 16000,
+            "default": 4000
+          },
+          "timeout_ms": {
+            "type": "integer",
+            "description": "Optional total process lifetime in milliseconds. Omitted means no automatic execution deadline.",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Optional per-instance retry key; identical operations only. The creation response is pinned while its command is active. Completed deduplication is bounded by a separate TTL and capacity; no cross-restart exactly-once guarantee."
+          },
+          "label": {
+            "type": "string",
+            "description": "Optional task label, for example build/frontend; persisted in metadata and available for filtering.",
+            "maxLength": 120
+          },
+          "capture_output": {
+            "type": "boolean",
+            "description": "Opt into disk capture from the beginning of this command, bounded by archive quotas. Raw output may contain secrets. Omitted uses history.record_output (default false)."
+          }
+        },
+        "required": [
+          "cmd"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "outputSchema": {
+        "type": "object",
+        "title": "Execution output, status and cursor",
+        "description": "Schema of structuredContent. Normal results include the bounded output chunk and execution metadata; a pre-result operation failure has only error. The same output chunk is also carried in text content for compatibility. Read MCP isError as well.",
+        "properties": {
+          "session_id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Execution handle owned by this server instance, not an OS PID. Retained after exit for output retrieval."
+          },
+          "instance_id": {
+            "type": "string",
+            "description": "Server runtime identifier; execution handles are invalid after the instance restarts."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "running",
+              "exited",
+              "terminating",
+              "terminated",
+              "timed_out",
+              "start_failed"
+            ],
+            "description": "Actual process state. running/terminating require follow-up. exited is not success unless exit_code is 0; inspect output as well."
+          },
+          "exit_code": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Observed exit code. Null while active, on startup failure, or when terminated by a signal. Nonzero is a command result, not a protocol failure."
+          },
+          "signal": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Observed termination signal, or null when none is reported."
+          },
+          "tty": {
+            "type": "boolean",
+            "description": "Whether this execution uses an interactive pseudo-terminal."
+          },
+          "workdir": {
+            "type": "string",
+            "description": "Resolved working directory used by this execution."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "Creation time in ISO 8601 UTC."
+          },
+          "ended_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Confirmed completion time in ISO 8601 UTC; null while active."
+          },
+          "output_start": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "UTF-8 byte position at which the returned text begins; excludes the metadata header."
+          },
+          "next_output_cursor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "UTF-8 byte offset to use for an explicit continuation or replay."
+          },
+          "has_more": {
+            "type": "boolean",
+            "description": "There is retained output beyond this chunk. Continue reading even after the process exits. False does not imply process completion."
+          },
+          "retained_from": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Earliest UTF-8 byte offset still retained by the bounded log."
+          },
+          "output_gap": {
+            "type": "boolean",
+            "description": "Requested output had already been evicted. Returned text is not a complete history when true."
+          },
+          "total_output_bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Observed UTF-8 output byte count. For archived logs, archive_output_bytes can be smaller when capture was truncated."
+          },
+          "budget_kind": {
+            "type": "string",
+            "const": "approximate",
+            "description": "max_output_tokens is a byte-based estimate, not the model tokenizer."
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "minimum": 256,
+            "maximum": 16000,
+            "description": "Effective approximate budget used for this response."
+          },
+          "effective_yield_time_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000,
+            "description": "Effective maximum wait for this call only; not the process lifetime."
+          },
+          "error": {
+            "type": "object",
+            "description": "Operation error. Additional operation-specific diagnostics may be present.",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Machine-readable operation error code. Use it to decide whether to reread, correct input, or recover a session."
+              },
+              "message": {
+                "type": "string",
+                "description": "Human-readable error description."
+              },
+              "instance_id": {
+                "type": "string",
+                "description": "Current runtime identifier when an execution handle is unknown."
+              },
+              "end": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "Last valid output byte position, when reporting an invalid output cursor."
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": true
+          },
+          "output": {
+            "type": "string",
+            "description": "This response's bounded UTF-8 decoded stdout/stderr chunk, without the metadata header. Present even when empty. Also available after the first newline in text content. Use next_output_cursor and has_more to continue; do not rerun the command."
+          },
+          "label": {
+            "type": "string",
+            "description": "Optional task label, for example build/frontend; persisted in metadata and available for filtering.",
+            "maxLength": 120
+          },
+          "archive_id": {
+            "type": "string",
+            "description": "Stable archived execution ID returned by a previous result or scope=history listing. This is not a filesystem path.",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.[1-9][0-9]{0,15}$"
+          },
+          "read_mode": {
+            "type": "string",
+            "description": "Read-only query mode.",
+            "enum": [
+              "tail",
+              "search"
+            ]
+          },
+          "tail_truncated": {
+            "type": "boolean",
+            "description": "Requested tail exceeds the byte budget or bounded scan window; returned text is a suffix."
+          },
+          "tail_window_limited": {
+            "type": "boolean",
+            "description": "Not enough line boundaries were found inside the bounded tail scan window."
+          },
+          "matches": {
+            "type": "array",
+            "description": "Literal matches in a bounded scan; only for search. Previews are bounded and may be truncated.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "byte_offset": {
+                  "type": "integer",
+                  "description": "UTF-8 byte position of this match.",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "text": {
+                  "type": "string",
+                  "description": "Bounded nearby log preview."
+                },
+                "preview_truncated": {
+                  "type": "boolean",
+                  "description": "The preview does not include the entire nearby line or match."
+                }
+              },
+              "required": [
+                "byte_offset",
+                "text",
+                "preview_truncated"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "search_next_cursor": {
+            "type": "integer",
+            "description": "Next explicit output_cursor to use with the same search. This is distinct from the execution default cursor.",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "search_has_more": {
+            "type": "boolean",
+            "description": "More retained bytes remain to be searched; does not describe process lifetime."
+          },
+          "search_scan_start": {
+            "type": "integer",
+            "description": "Beginning of the inspected search window.",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "search_scan_end": {
+            "type": "integer",
+            "description": "End of the inspected search window; continuation may overlap this window.",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "source": {
+            "type": "string",
+            "description": "history indicates a read-only archived result.",
+            "enum": [
+              "history"
+            ]
+          },
+          "archive_output_bytes": {
+            "type": "integer",
+            "description": "Available archived prefix length; valid archived cursor range is 0 to this value.",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "archive_truncated": {
+            "type": "boolean",
+            "description": "Some output was not saved because of quota, I/O failure or archive recovery. A false has_more is not a completeness claim."
+          },
+          "history_warning": {
+            "type": "string",
+            "description": "Archive-specific warning; do not treat unconfirmed outcomes or missing output as success."
+          },
+          "history_state": {
+            "type": "string",
+            "enum": [
+              "disabled",
+              "starting",
+              "ready",
+              "degraded"
+            ],
+            "description": "Local history storage state; degraded execution may still succeed but archive data needs attention."
+          }
+        },
+        "additionalProperties": false,
+        "oneOf": [
+          {
+            "required": [
+              "session_id",
+              "instance_id",
+              "state",
+              "exit_code",
+              "signal",
+              "tty",
+              "workdir",
+              "created_at",
+              "ended_at",
+              "output_start",
+              "next_output_cursor",
+              "has_more",
+              "retained_from",
+              "output_gap",
+              "total_output_bytes",
+              "budget_kind",
+              "max_output_tokens",
+              "effective_yield_time_ms",
+              "output"
+            ]
+          },
+          {
+            "required": [
+              "error"
+            ],
+            "maxProperties": 1
+          }
+        ],
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "state"
+              ],
+              "properties": {
+                "state": {
+                  "enum": [
+                    "running",
+                    "terminating"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "exit_code": {
+                  "type": "null"
+                },
+                "ended_at": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "state"
+              ],
+              "properties": {
+                "state": {
+                  "enum": [
+                    "exited",
+                    "terminated",
+                    "timed_out",
+                    "start_failed"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "ended_at": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "state"
+              ],
+              "properties": {
+                "state": {
+                  "const": "start_failed"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "error"
+              ],
+              "properties": {
+                "exit_code": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "write_stdin",
+      "description": "Send characters to an existing PTY session or poll output with empty chars. Read process state and exit_code to determine completion. An ended session may still contain unread output. Non-empty input to pipe sessions fails with STDIN_CLOSED. Use longer bounded waits for quiet long tasks; do not launch the command again. Read the command output from the output field in structuredContent; the same chunk is also available in text content. For read-only tail or literal search use tail_lines or search. For disk logs pass archive_id together with its session_id; history reads default to offset 0 and never accept input. Inspect archive_truncated; archived records cannot resume old processes. Search returns matches and search_next_cursor, not concatenated output.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "integer",
+            "description": "Execution handle returned by this server, not an OS PID or MCP connection id.",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "chars": {
+            "type": "string",
+            "default": "",
+            "description": "Characters to write; empty means read only. Control characters retain PTY semantics."
+          },
+          "yield_time_ms": {
+            "type": "integer",
+            "description": "Maximum wait for this response only; not a process timeout. Return earlier when output or completion is available. Omitted defaults to 250 ms for input, 5000 ms for empty polls.",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "description": "Approximate text budget: at most min(4 * value, 65536) UTF-8 bytes. Not an exact model token count.",
+            "minimum": 256,
+            "maximum": 16000,
+            "default": 4000
+          },
+          "output_cursor": {
+            "type": "integer",
+            "description": "Explicit UTF-8 log byte offset. Omitting uses and advances the session default cursor; an explicit read does not advance that default.",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Optional per-instance retry key; identical operations only. The creation response is pinned while its command is active. Completed deduplication is bounded by a separate TTL and capacity; no cross-restart exactly-once guarantee."
+          },
+          "archive_id": {
+            "type": "string",
+            "description": "Stable archived execution ID returned by a previous result or scope=history listing. This is not a filesystem path.",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.[1-9][0-9]{0,15}$"
+          },
+          "tail_lines": {
+            "type": "integer",
+            "description": "Read the last N logical lines without advancing the default cursor. Mutually exclusive with search and output_cursor. Output is still byte-budget bounded.",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "search": {
+            "type": "string",
+            "description": "Read-only literal case-sensitive UTF-8 search, not a regular expression. Matches are returned in matches; continue with search_next_cursor. Does not advance the default log cursor.",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "max_matches": {
+            "type": "integer",
+            "description": "Maximum search matches per call; requires search.",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20
+          }
+        },
+        "required": [
+          "session_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "outputSchema": {
+        "type": "object",
+        "title": "Execution output, status and cursor",
+        "description": "Schema of structuredContent. Normal results include the bounded output chunk and execution metadata; a pre-result operation failure has only error. The same output chunk is also carried in text content for compatibility. Read MCP isError as well.",
+        "properties": {
+          "session_id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Execution handle owned by this server instance, not an OS PID. Retained after exit for output retrieval."
+          },
+          "instance_id": {
+            "type": "string",
+            "description": "Server runtime identifier; execution handles are invalid after the instance restarts."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "running",
+              "exited",
+              "terminating",
+              "terminated",
+              "timed_out",
+              "start_failed",
+              "unknown"
+            ],
+            "description": "Actual process state. running/terminating require follow-up. exited is not success unless exit_code is 0; inspect output as well."
+          },
+          "exit_code": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Observed exit code. Null while active, on startup failure, or when terminated by a signal. Nonzero is a command result, not a protocol failure."
+          },
+          "signal": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Observed termination signal, or null when none is reported."
+          },
+          "tty": {
+            "type": "boolean",
+            "description": "Whether this execution uses an interactive pseudo-terminal."
+          },
+          "workdir": {
+            "type": "string",
+            "description": "Resolved working directory used by this execution."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "Creation time in ISO 8601 UTC."
+          },
+          "ended_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Confirmed completion time in ISO 8601 UTC; null while active."
+          },
+          "output_start": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "UTF-8 byte position at which the returned text begins; excludes the metadata header."
+          },
+          "next_output_cursor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "UTF-8 byte offset to use for an explicit continuation or replay."
+          },
+          "has_more": {
+            "type": "boolean",
+            "description": "There is retained output beyond this chunk. Continue reading even after the process exits. False does not imply process completion."
+          },
+          "retained_from": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Earliest UTF-8 byte offset still retained by the bounded log."
+          },
+          "output_gap": {
+            "type": "boolean",
+            "description": "Requested output had already been evicted. Returned text is not a complete history when true."
+          },
+          "total_output_bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Observed UTF-8 output byte count. For archived logs, archive_output_bytes can be smaller when capture was truncated."
+          },
+          "budget_kind": {
+            "type": "string",
+            "const": "approximate",
+            "description": "max_output_tokens is a byte-based estimate, not the model tokenizer."
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "minimum": 256,
+            "maximum": 16000,
+            "description": "Effective approximate budget used for this response."
+          },
+          "effective_yield_time_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000,
+            "description": "Effective maximum wait for this call only; not the process lifetime."
+          },
+          "error": {
+            "type": "object",
+            "description": "Operation error. Additional operation-specific diagnostics may be present.",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Machine-readable operation error code. Use it to decide whether to reread, correct input, or recover a session."
+              },
+              "message": {
+                "type": "string",
+                "description": "Human-readable error description."
+              },
+              "instance_id": {
+                "type": "string",
+                "description": "Current runtime identifier when an execution handle is unknown."
+              },
+              "end": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "Last valid output byte position, when reporting an invalid output cursor."
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": true
+          },
+          "output": {
+            "type": "string",
+            "description": "This response's bounded UTF-8 decoded stdout/stderr chunk, without the metadata header. Present even when empty. Also available after the first newline in text content. Use next_output_cursor and has_more to continue; do not rerun the command."
+          },
+          "label": {
+            "type": "string",
+            "description": "Optional task label, for example build/frontend; persisted in metadata and available for filtering.",
+            "maxLength": 120
+          },
+          "archive_id": {
+            "type": "string",
+            "description": "Stable archived execution ID returned by a previous result or scope=history listing. This is not a filesystem path.",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.[1-9][0-9]{0,15}$"
+          },
+          "read_mode": {
+            "type": "string",
+            "description": "Read-only query mode.",
+            "enum": [
+              "tail",
+              "search"
+            ]
+          },
+          "tail_truncated": {
+            "type": "boolean",
+            "description": "Requested tail exceeds the byte budget or bounded scan window; returned text is a suffix."
+          },
+          "tail_window_limited": {
+            "type": "boolean",
+            "description": "Not enough line boundaries were found inside the bounded tail scan window."
+          },
+          "matches": {
+            "type": "array",
+            "description": "Literal matches in a bounded scan; only for search. Previews are bounded and may be truncated.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "byte_offset": {
+                  "type": "integer",
+                  "description": "UTF-8 byte position of this match.",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "text": {
+                  "type": "string",
+                  "description": "Bounded nearby log preview."
+                },
+                "preview_truncated": {
+                  "type": "boolean",
+                  "description": "The preview does not include the entire nearby line or match."
+                }
+              },
+              "required": [
+                "byte_offset",
+                "text",
+                "preview_truncated"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "search_next_cursor": {
+            "type": "integer",
+            "description": "Next explicit output_cursor to use with the same search. This is distinct from the execution default cursor.",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "search_has_more": {
+            "type": "boolean",
+            "description": "More retained bytes remain to be searched; does not describe process lifetime."
+          },
+          "search_scan_start": {
+            "type": "integer",
+            "description": "Beginning of the inspected search window.",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "search_scan_end": {
+            "type": "integer",
+            "description": "End of the inspected search window; continuation may overlap this window.",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "source": {
+            "type": "string",
+            "description": "history indicates a read-only archived result.",
+            "enum": [
+              "history"
+            ]
+          },
+          "archive_output_bytes": {
+            "type": "integer",
+            "description": "Available archived prefix length; valid archived cursor range is 0 to this value.",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "archive_truncated": {
+            "type": "boolean",
+            "description": "Some output was not saved because of quota, I/O failure or archive recovery. A false has_more is not a completeness claim."
+          },
+          "history_warning": {
+            "type": "string",
+            "description": "Archive-specific warning; do not treat unconfirmed outcomes or missing output as success."
+          },
+          "history_state": {
+            "type": "string",
+            "enum": [
+              "disabled",
+              "starting",
+              "ready",
+              "degraded"
+            ],
+            "description": "Local history storage state; degraded execution may still succeed but archive data needs attention."
+          }
+        },
+        "additionalProperties": false,
+        "oneOf": [
+          {
+            "required": [
+              "session_id",
+              "instance_id",
+              "state",
+              "exit_code",
+              "signal",
+              "tty",
+              "workdir",
+              "created_at",
+              "ended_at",
+              "output_start",
+              "next_output_cursor",
+              "has_more",
+              "retained_from",
+              "output_gap",
+              "total_output_bytes",
+              "budget_kind",
+              "max_output_tokens",
+              "effective_yield_time_ms",
+              "output"
+            ]
+          },
+          {
+            "required": [
+              "error"
+            ],
+            "maxProperties": 1
+          }
+        ],
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "state"
+              ],
+              "properties": {
+                "state": {
+                  "enum": [
+                    "running",
+                    "terminating"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "exit_code": {
+                  "type": "null"
+                },
+                "ended_at": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "state"
+              ],
+              "properties": {
+                "state": {
+                  "enum": [
+                    "exited",
+                    "terminated",
+                    "timed_out",
+                    "start_failed"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "ended_at": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "state"
+              ],
+              "properties": {
+                "state": {
+                  "const": "start_failed"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "error"
+              ],
+              "properties": {
+                "exit_code": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "state"
+              ],
+              "properties": {
+                "state": {
+                  "const": "unknown"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "source",
+                "archive_id"
+              ],
+              "properties": {
+                "source": {
+                  "const": "history"
+                },
+                "exit_code": {
+                  "type": "null"
+                },
+                "signal": {
+                  "type": "null"
+                },
+                "ended_at": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "apply_patch",
+      "description": "Edit files using the Codex-style *** Begin Patch / *** End Patch format, provided as the JSON patch string. Supports Add File, Update File, Delete File, Move to and multiple hunks. Not git unified diff and not a freeform MCP argument. Existing Add/Move destinations are rejected. Multi-file changes are not atomic; inspect partial failures.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "patch": {
+            "type": "string",
+            "description": "Complete patch text, including envelope and line prefixes.",
+            "minLength": 1
+          },
+          "workdir": {
+            "type": "string",
+            "description": "Working directory. Relative values resolve against the fixed server cwd; omitted uses that cwd.",
+            "minLength": 1
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Optional per-instance retry key; identical operations only. The creation response is pinned while its command is active. Completed deduplication is bounded by a separate TTL and capacity; no cross-restart exactly-once guarantee."
+          }
+        },
+        "required": [
+          "patch"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "title": "Patch application result",
+        "description": "Schema of structuredContent only. A normal result has the documented metadata; a pre-result operation failure has only error. Read MCP isError as well. Text logs and image bytes are carried in content, not repeated here.",
+        "properties": {
+          "applied": {
+            "type": "boolean",
+            "const": true,
+            "description": "All planned file operations completed. Does not mean tests have passed."
+          },
+          "partial": {
+            "type": "boolean",
+            "const": false,
+            "description": "Successful complete result. For partial failures inspect error.partial and error.changes."
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "An observed file change.",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "add",
+                    "update",
+                    "delete",
+                    "move"
+                  ],
+                  "description": "Operation actually performed, not merely planned."
+                },
+                "path": {
+                  "type": "string",
+                  "description": "Affected absolute path; destination for a move."
+                },
+                "from": {
+                  "type": "string",
+                  "description": "Original absolute path for a move."
+                },
+                "to": {
+                  "type": "string",
+                  "description": "Destination absolute path for a move."
+                },
+                "source_removed": {
+                  "type": "boolean",
+                  "description": "For moves, whether removal of the original path has completed. False can occur after partial failure."
+                }
+              },
+              "required": [
+                "operation",
+                "path"
+              ],
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "operation": {
+                        "const": "move"
+                      }
+                    },
+                    "required": [
+                      "operation"
+                    ]
+                  },
+                  "then": {
+                    "required": [
+                      "from",
+                      "to",
+                      "source_removed"
+                    ]
+                  },
+                  "else": {
+                    "not": {
+                      "anyOf": [
+                        {
+                          "required": [
+                            "from"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "to"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "source_removed"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            "description": "All file changes actually performed."
+          },
+          "created_directories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Directories created while applying the patch."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Non-fatal warnings, including temporary-file cleanup failures."
+          },
+          "error": {
+            "type": "object",
+            "description": "Operation error. Additional operation-specific diagnostics may be present.",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Machine-readable operation error code. Use it to decide whether to reread, correct input, or recover a session."
+              },
+              "message": {
+                "type": "string",
+                "description": "Human-readable error description."
+              },
+              "instance_id": {
+                "type": "string",
+                "description": "Current runtime identifier when an execution handle is unknown."
+              },
+              "end": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "Last valid output byte position, when reporting an invalid output cursor."
+              },
+              "path": {
+                "type": "string",
+                "description": "Path associated with the failure."
+              },
+              "applied": {
+                "type": "boolean",
+                "const": false,
+                "description": "False when the entire patch was not applied."
+              },
+              "partial": {
+                "type": "boolean",
+                "description": "True means file changes or directory creation already occurred; inspect changes before retrying."
+              },
+              "changes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "description": "An observed file change.",
+                  "properties": {
+                    "operation": {
+                      "type": "string",
+                      "enum": [
+                        "add",
+                        "update",
+                        "delete",
+                        "move"
+                      ],
+                      "description": "Operation actually performed, not merely planned."
+                    },
+                    "path": {
+                      "type": "string",
+                      "description": "Affected absolute path; destination for a move."
+                    },
+                    "from": {
+                      "type": "string",
+                      "description": "Original absolute path for a move."
+                    },
+                    "to": {
+                      "type": "string",
+                      "description": "Destination absolute path for a move."
+                    },
+                    "source_removed": {
+                      "type": "boolean",
+                      "description": "For moves, whether removal of the original path has completed. False can occur after partial failure."
+                    }
+                  },
+                  "required": [
+                    "operation",
+                    "path"
+                  ],
+                  "additionalProperties": false,
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {
+                          "operation": {
+                            "const": "move"
+                          }
+                        },
+                        "required": [
+                          "operation"
+                        ]
+                      },
+                      "then": {
+                        "required": [
+                          "from",
+                          "to",
+                          "source_removed"
+                        ]
+                      },
+                      "else": {
+                        "not": {
+                          "anyOf": [
+                            {
+                              "required": [
+                                "from"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "to"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "source_removed"
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "description": "File changes completed before failure."
+              },
+              "failed_path": {
+                "type": "string",
+                "description": "Operation path at which patch application stopped."
+              },
+              "created_directories": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Directories actually created before failure."
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Cleanup or other non-fatal warnings."
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": true,
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "code": {
+                      "const": "PARTIAL_APPLY"
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "applied",
+                    "partial",
+                    "changes",
+                    "failed_path",
+                    "created_directories",
+                    "warnings"
+                  ],
+                  "properties": {
+                    "partial": {
+                      "const": true
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "oneOf": [
+          {
+            "required": [
+              "applied",
+              "partial",
+              "changes",
+              "created_directories",
+              "warnings"
+            ],
+            "not": {
+              "required": [
+                "error"
+              ]
+            }
+          },
+          {
+            "required": [
+              "error"
+            ],
+            "maxProperties": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "view_image",
+      "description": "Read an existing host image and return actual MCP image content. Supports PNG, JPEG and WebP, with configured size limits and optional resizing. It does not take screenshots or open a browser. Relative image paths resolve within workdir or the fixed server cwd.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path to an existing image.",
+            "minLength": 1
+          },
+          "workdir": {
+            "type": "string",
+            "description": "Working directory. Relative values resolve against the fixed server cwd; omitted uses that cwd.",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "title": "Returned image metadata",
+        "description": "Schema of structuredContent only. A normal result has the documented metadata; a pre-result operation failure has only error. Read MCP isError as well. Text logs and image bytes are carried in content, not repeated here.",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Resolved path of the source image, which is not modified."
+          },
+          "mime_type": {
+            "type": "string",
+            "enum": [
+              "image/png",
+              "image/jpeg",
+              "image/webp"
+            ],
+            "description": "MIME type of the actual ImageContent block."
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Returned image width in pixels."
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Returned image height in pixels."
+          },
+          "original_width": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Source metadata width in pixels, before orientation and resizing."
+          },
+          "original_height": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Source metadata height in pixels, before orientation and resizing."
+          },
+          "encoded_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Byte length of base64 image text in ImageContent, not decoded pixel memory."
+          },
+          "resized": {
+            "type": "boolean",
+            "description": "Returned dimensions differ from the source metadata, including orientation changes."
+          },
+          "error": {
+            "type": "object",
+            "description": "Operation error. Additional operation-specific diagnostics may be present.",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Machine-readable operation error code. Use it to decide whether to reread, correct input, or recover a session."
+              },
+              "message": {
+                "type": "string",
+                "description": "Human-readable error description."
+              },
+              "instance_id": {
+                "type": "string",
+                "description": "Current runtime identifier when an execution handle is unknown."
+              },
+              "end": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "Last valid output byte position, when reporting an invalid output cursor."
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": false,
+        "oneOf": [
+          {
+            "required": [
+              "path",
+              "mime_type",
+              "width",
+              "height",
+              "original_width",
+              "original_height",
+              "encoded_bytes",
+              "resized"
+            ],
+            "not": {
+              "required": [
+                "error"
+              ]
+            }
+          },
+          {
+            "required": [
+              "error"
+            ],
+            "maxProperties": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "list_exec_sessions",
+      "description": "List execution records, with workdir, label, outcome and ordering filters. Default scope=current preserves in-memory session behavior; scope=history reads bounded disk history across service restarts. Historical unknown means the final process outcome was not confirmed, not a failed or resumable task. Use archive_id with write_stdin to read captured logs. Never rerun a command just because its cache record was evicted.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "running",
+              "exited",
+              "terminating",
+              "terminated",
+              "timed_out",
+              "start_failed",
+              "unknown"
+            ],
+            "description": "Optional state filter."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum records returned per page.",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Opaque next-page cursor returned by a previous call.",
+            "minLength": 1
+          },
+          "scope": {
+            "type": "string",
+            "description": "current lists only this instance's in-memory records. history queries bounded on-disk records across prior instances, including unconfirmed outcomes.",
+            "enum": [
+              "current",
+              "history"
+            ],
+            "default": "current"
+          },
+          "workdir": {
+            "type": "string",
+            "description": "Filter by exact resolved workdir; relative values resolve against server cwd.",
+            "minLength": 1
+          },
+          "label": {
+            "type": "string",
+            "description": "Case-sensitive substring of the task label.",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "outcome": {
+            "type": "string",
+            "description": "Optional result filter; unknown denotes a previous instance whose final outcome was not recorded.",
+            "enum": [
+              "success",
+              "failure",
+              "unknown"
+            ]
+          },
+          "order": {
+            "type": "string",
+            "description": "Order within a stable snapshot: current defaults ascending, history defaults descending.",
+            "enum": [
+              "asc",
+              "desc"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "title": "Execution session listing",
+        "description": "Schema of structuredContent only. A normal result has the documented metadata; a pre-result operation failure has only error. Read MCP isError as well. Text logs and image bytes are carried in content, not repeated here.",
+        "properties": {
+          "instance_id": {
+            "type": "string",
+            "description": "Runtime that owns all entries in this page."
+          },
+          "sessions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "One execution owned by this server.",
+              "properties": {
+                "session_id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991,
+                  "description": "Execution handle owned by this server instance, not an OS PID. Retained after exit for output retrieval."
+                },
+                "instance_id": {
+                  "type": "string",
+                  "description": "Server runtime identifier; execution handles are invalid after the instance restarts."
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "running",
+                    "exited",
+                    "terminating",
+                    "terminated",
+                    "timed_out",
+                    "start_failed",
+                    "unknown"
+                  ],
+                  "description": "Actual process state. running/terminating require follow-up. exited is not success unless exit_code is 0; inspect output as well."
+                },
+                "exit_code": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "Observed exit code. Null while active, on startup failure, or when terminated by a signal. Nonzero is a command result, not a protocol failure."
+                },
+                "signal": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Observed termination signal, or null when none is reported."
+                },
+                "tty": {
+                  "type": "boolean",
+                  "description": "Whether this execution uses an interactive pseudo-terminal."
+                },
+                "workdir": {
+                  "type": "string",
+                  "description": "Resolved working directory used by this execution."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "Creation time in ISO 8601 UTC."
+                },
+                "ended_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Confirmed completion time in ISO 8601 UTC; null while active."
+                },
+                "cmd": {
+                  "type": "string",
+                  "description": "Command summary, truncated to 512 characters plus ellipsis when longer."
+                },
+                "request_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Original execution retry key or null."
+                },
+                "next_output_cursor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "Current default log cursor; use output_cursor=0 explicitly to recover retained initial output."
+                },
+                "total_output_bytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "Cumulative log byte count, including evicted output."
+                },
+                "retained_from": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "Earliest retained output offset."
+                },
+                "label": {
+                  "type": "string",
+                  "description": "Optional task label, for example build/frontend; persisted in metadata and available for filtering.",
+                  "maxLength": 120
+                },
+                "archive_id": {
+                  "type": "string",
+                  "description": "Stable archived execution ID returned by a previous result or scope=history listing. This is not a filesystem path.",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.[1-9][0-9]{0,15}$"
+                },
+                "archive_output_bytes": {
+                  "type": "integer",
+                  "description": "Available archived prefix length; valid archived cursor range is 0 to this value.",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "archive_truncated": {
+                  "type": "boolean",
+                  "description": "Some output was not saved because of quota, I/O failure or archive recovery. A false has_more is not a completeness claim."
+                },
+                "history_warning": {
+                  "type": "string",
+                  "description": "Archive-specific warning; do not treat unconfirmed outcomes or missing output as success."
+                },
+                "capture_output": {
+                  "type": "boolean",
+                  "description": "Whether this execution opted into raw output capture."
+                },
+                "history_state": {
+                  "type": "string",
+                  "enum": [
+                    "disabled",
+                    "starting",
+                    "ready",
+                    "degraded"
+                  ],
+                  "description": "Current history storage state when returning an in-memory entry."
+                }
+              },
+              "required": [
+                "session_id",
+                "instance_id",
+                "state",
+                "exit_code",
+                "signal",
+                "tty",
+                "workdir",
+                "created_at",
+                "ended_at",
+                "cmd",
+                "request_id",
+                "next_output_cursor",
+                "total_output_bytes",
+                "retained_from"
+              ],
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "if": {
+                    "required": [
+                      "state"
+                    ],
+                    "properties": {
+                      "state": {
+                        "enum": [
+                          "running",
+                          "terminating"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "exit_code": {
+                        "type": "null"
+                      },
+                      "ended_at": {
+                        "type": "null"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "required": [
+                      "state"
+                    ],
+                    "properties": {
+                      "state": {
+                        "enum": [
+                          "exited",
+                          "terminated",
+                          "timed_out",
+                          "start_failed"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "ended_at": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "required": [
+                      "state"
+                    ],
+                    "properties": {
+                      "state": {
+                        "const": "unknown"
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "archive_id"
+                    ],
+                    "properties": {
+                      "exit_code": {
+                        "type": "null"
+                      },
+                      "signal": {
+                        "type": "null"
+                      },
+                      "ended_at": {
+                        "type": "null"
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            "description": "Retained executions, not all OS processes or ChatGPT conversations."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Opaque next-page cursor or null when no further page remains; reuse the same state filter."
+          },
+          "error": {
+            "type": "object",
+            "description": "Operation error. Additional operation-specific diagnostics may be present.",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Machine-readable operation error code. Use it to decide whether to reread, correct input, or recover a session."
+              },
+              "message": {
+                "type": "string",
+                "description": "Human-readable error description."
+              },
+              "instance_id": {
+                "type": "string",
+                "description": "Current runtime identifier when an execution handle is unknown."
+              },
+              "end": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "Last valid output byte position, when reporting an invalid output cursor."
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": true
+          },
+          "scope": {
+            "type": "string",
+            "description": "history when listing disk history.",
+            "enum": [
+              "history"
+            ]
+          },
+          "history_status": {
+            "type": "object",
+            "description": "Bounded local archive status, not a remote availability guarantee.",
+            "properties": {
+              "state": {
+                "type": "string",
+                "description": "History storage readiness.",
+                "enum": [
+                  "disabled",
+                  "starting",
+                  "ready",
+                  "degraded"
+                ]
+              },
+              "directory": {
+                "type": "string",
+                "description": "Resolved dedicated local history directory."
+              },
+              "records": {
+                "type": "integer",
+                "description": "Number of indexed records.",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "bytes": {
+                "type": "integer",
+                "description": "Indexed metadata and log bytes.",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "pending_bytes": {
+                "type": "integer",
+                "description": "Queued raw output bytes, bounded by configuration.",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "max_records": {
+                "type": "integer",
+                "description": "Archive record-count cap.",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "max_total_bytes": {
+                "type": "integer",
+                "description": "Archive byte quota.",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "record_command": {
+                "type": "boolean",
+                "description": "Whether command text is saved by default."
+              },
+              "record_output": {
+                "type": "boolean",
+                "description": "Whether raw output is saved by default."
+              },
+              "evicted_records": {
+                "type": "integer",
+                "description": "Records removed by capacity rotation in this instance.",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "warnings": {
+                "type": "array",
+                "description": "Bounded diagnostics; includes storage degradation.",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "state",
+              "directory",
+              "records",
+              "bytes",
+              "pending_bytes",
+              "max_records",
+              "max_total_bytes",
+              "record_command",
+              "record_output",
+              "evicted_records",
+              "warnings"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false,
+        "oneOf": [
+          {
+            "required": [
+              "instance_id",
+              "sessions",
+              "next_cursor"
+            ],
+            "not": {
+              "required": [
+                "error"
+              ]
+            }
+          },
+          {
+            "required": [
+              "error"
+            ],
+            "maxProperties": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "terminate_exec_session",
+      "description": "Request termination of a command created by this server. Works for both pipe and PTY sessions. force=true skips the graceful signal stage. A terminating response is not proof of exit; poll until an observed terminal state. Already-ended records keep their existing terminal result.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "integer",
+            "description": "Execution handle returned by this server, not an OS PID or MCP connection id.",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "force": {
+            "type": "boolean",
+            "description": "Skip graceful termination and request forced termination.",
+            "default": false
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Optional per-instance retry key; identical operations only. The creation response is pinned while its command is active. Completed deduplication is bounded by a separate TTL and capacity; no cross-restart exactly-once guarantee."
+          }
+        },
+        "required": [
+          "session_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "title": "Execution termination result",
+        "description": "Schema of structuredContent only. A normal result has the documented metadata; a pre-result operation failure has only error. Read MCP isError as well. Text logs and image bytes are carried in content, not repeated here.",
+        "properties": {
+          "session_id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Execution handle owned by this server instance, not an OS PID. Retained after exit for output retrieval."
+          },
+          "instance_id": {
+            "type": "string",
+            "description": "Server runtime identifier; execution handles are invalid after the instance restarts."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "running",
+              "exited",
+              "terminating",
+              "terminated",
+              "timed_out",
+              "start_failed"
+            ],
+            "description": "Actual process state. running/terminating require follow-up. exited is not success unless exit_code is 0; inspect output as well."
+          },
+          "exit_code": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Observed exit code. Null while active, on startup failure, or when terminated by a signal. Nonzero is a command result, not a protocol failure."
+          },
+          "signal": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Observed termination signal, or null when none is reported."
+          },
+          "tty": {
+            "type": "boolean",
+            "description": "Whether this execution uses an interactive pseudo-terminal."
+          },
+          "workdir": {
+            "type": "string",
+            "description": "Resolved working directory used by this execution."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "Creation time in ISO 8601 UTC."
+          },
+          "ended_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Confirmed completion time in ISO 8601 UTC; null while active."
+          },
+          "termination_confirmed": {
+            "type": "boolean",
+            "description": "True only when a terminal state has been observed. False requires another status check; no success is inferred from sending a signal."
+          },
+          "error": {
+            "type": "object",
+            "description": "Operation error. Additional operation-specific diagnostics may be present.",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Machine-readable operation error code. Use it to decide whether to reread, correct input, or recover a session."
+              },
+              "message": {
+                "type": "string",
+                "description": "Human-readable error description."
+              },
+              "instance_id": {
+                "type": "string",
+                "description": "Current runtime identifier when an execution handle is unknown."
+              },
+              "end": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "Last valid output byte position, when reporting an invalid output cursor."
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": true
+          },
+          "label": {
+            "type": "string",
+            "description": "Optional task label, for example build/frontend; persisted in metadata and available for filtering.",
+            "maxLength": 120
+          },
+          "archive_id": {
+            "type": "string",
+            "description": "Stable archived execution ID returned by a previous result or scope=history listing. This is not a filesystem path.",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.[1-9][0-9]{0,15}$"
+          },
+          "history_state": {
+            "type": "string",
+            "enum": [
+              "disabled",
+              "starting",
+              "ready",
+              "degraded"
+            ],
+            "description": "Local history storage state; degraded execution may still succeed but archive data needs attention."
+          },
+          "history_warning": {
+            "type": "string",
+            "description": "Bounded history diagnostic, not a process success indicator."
+          }
+        },
+        "additionalProperties": false,
+        "oneOf": [
+          {
+            "required": [
+              "session_id",
+              "instance_id",
+              "state",
+              "exit_code",
+              "signal",
+              "tty",
+              "workdir",
+              "created_at",
+              "ended_at",
+              "termination_confirmed"
+            ]
+          },
+          {
+            "required": [
+              "error"
+            ],
+            "maxProperties": 1
+          }
+        ],
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "state"
+              ],
+              "properties": {
+                "state": {
+                  "enum": [
+                    "running",
+                    "terminating"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "exit_code": {
+                  "type": "null"
+                },
+                "ended_at": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "state"
+              ],
+              "properties": {
+                "state": {
+                  "enum": [
+                    "exited",
+                    "terminated",
+                    "timed_out",
+                    "start_failed"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "ended_at": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "state"
+              ],
+              "properties": {
+                "state": {
+                  "enum": [
+                    "running",
+                    "terminating"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "termination_confirmed": {
+                  "const": false
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "state"
+              ],
+              "properties": {
+                "state": {
+                  "enum": [
+                    "exited",
+                    "terminated",
+                    "timed_out",
+                    "start_failed"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "termination_confirmed": {
+                  "const": true
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

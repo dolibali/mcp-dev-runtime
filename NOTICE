@@ -1,0 +1,7 @@
+MCP Dev Runtime
+Copyright 2026 MCP Dev Runtime contributors
+
+Independent community project. Not an OpenAI product or endorsement.
+Codex source was consulted for tool vocabulary and patch parsing. The optional
+OpenAI tunnel-client source and binaries retain their upstream Apache-2.0
+licenses and notices. See THIRD_PARTY_NOTICES.md and tunnel.lock.json.

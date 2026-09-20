@@ -1,0 +1,24 @@
+name: Source package (manual)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:all
+      - run: npm run release:source
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mcp-dev-runtime-source
+          path: artifacts/*
+          if-no-files-found: error

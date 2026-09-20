@@ -1,0 +1,10 @@
+{
+  "runtime_config": "config.json",
+  "state_dir": ".runtime",
+  "tunnel_health_port": 9098,
+  "ready_timeout_ms": 30000,
+  "shell_env": false,
+  "health_interval_ms": 5000,
+  "log_max_bytes": 10485760,
+  "log_files": 3
+}

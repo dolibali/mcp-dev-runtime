@@ -1,0 +1,342 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "transport": {
+      "default": "http",
+      "type": "string",
+      "enum": [
+        "http",
+        "stdio"
+      ]
+    },
+    "host": {
+      "default": "127.0.0.1",
+      "type": "string",
+      "minLength": 1
+    },
+    "port": {
+      "default": 3001,
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65535
+    },
+    "mcp_path": {
+      "default": "/mcp",
+      "type": "string",
+      "format": "starts_with",
+      "pattern": "^\\/.*"
+    },
+    "health_path": {
+      "default": "/healthz",
+      "type": "string",
+      "format": "starts_with",
+      "pattern": "^\\/.*"
+    },
+    "cwd": {
+      "default": ".",
+      "type": "string",
+      "minLength": 1
+    },
+    "shell": {
+      "default": "/bin/zsh",
+      "type": "string",
+      "minLength": 1
+    },
+    "exec": {
+      "type": "object",
+      "properties": {
+        "default_login": {
+          "default": false,
+          "type": "boolean"
+        },
+        "default_tty": {
+          "default": false,
+          "type": "boolean"
+        },
+        "default_yield_time_ms": {
+          "default": 1000,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "max_yield_time_ms": {
+          "default": 10000,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "default_max_output_tokens": {
+          "default": 4000,
+          "type": "integer",
+          "minimum": 256,
+          "maximum": 16000
+        },
+        "max_output_tokens": {
+          "default": 16000,
+          "type": "integer",
+          "minimum": 256,
+          "maximum": 16000
+        },
+        "max_active_sessions": {
+          "default": 8,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "per_session_output_bytes": {
+          "default": 8388608,
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 268435456
+        },
+        "total_output_bytes": {
+          "default": 67108864,
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 1073741824
+        },
+        "retained_session_ms": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "number",
+              "const": 0
+            },
+            {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 86400000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max_ended_sessions": {
+          "default": 512,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "maintenance_interval_ms": {
+          "default": 30000,
+          "type": "integer",
+          "minimum": 50,
+          "maximum": 300000
+        },
+        "termination_grace_ms": {
+          "default": 2000,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "default_poll_yield_time_ms": {
+          "default": 5000,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "default_input_yield_time_ms": {
+          "default": 250,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        }
+      },
+      "required": [
+        "default_login",
+        "default_tty",
+        "default_yield_time_ms",
+        "max_yield_time_ms",
+        "default_max_output_tokens",
+        "max_output_tokens",
+        "max_active_sessions",
+        "per_session_output_bytes",
+        "total_output_bytes",
+        "retained_session_ms",
+        "max_ended_sessions",
+        "maintenance_interval_ms",
+        "termination_grace_ms",
+        "default_poll_yield_time_ms",
+        "default_input_yield_time_ms"
+      ],
+      "additionalProperties": false
+    },
+    "history": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "type": "boolean"
+        },
+        "directory": {
+          "default": ".mcp-dev-runtime/history",
+          "type": "string",
+          "minLength": 1
+        },
+        "record_command": {
+          "default": false,
+          "type": "boolean"
+        },
+        "record_output": {
+          "default": false,
+          "type": "boolean"
+        },
+        "max_records": {
+          "default": 4096,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "max_total_bytes": {
+          "default": 268435456,
+          "type": "integer",
+          "minimum": 65536,
+          "maximum": 10737418240
+        },
+        "max_log_bytes": {
+          "default": 16777216,
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 268435456
+        },
+        "max_pending_bytes": {
+          "default": 1048576,
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 16777216
+        }
+      },
+      "required": [
+        "enabled",
+        "directory",
+        "record_command",
+        "record_output",
+        "max_records",
+        "max_total_bytes",
+        "max_log_bytes",
+        "max_pending_bytes"
+      ],
+      "additionalProperties": false
+    },
+    "image": {
+      "type": "object",
+      "properties": {
+        "max_encoded_bytes": {
+          "default": 8388608,
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 33554432
+        },
+        "max_input_bytes": {
+          "default": 33554432,
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 134217728
+        },
+        "max_input_pixels": {
+          "default": 40000000,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000000
+        },
+        "max_output_dimension": {
+          "default": 2048,
+          "type": "integer",
+          "minimum": 32,
+          "maximum": 8192
+        }
+      },
+      "required": [
+        "max_encoded_bytes",
+        "max_input_bytes",
+        "max_input_pixels",
+        "max_output_dimension"
+      ],
+      "additionalProperties": false
+    },
+    "patch": {
+      "type": "object",
+      "properties": {
+        "max_patch_bytes": {
+          "default": 4194304,
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 16777216
+        },
+        "max_file_bytes": {
+          "default": 16777216,
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 134217728
+        },
+        "max_total_file_bytes": {
+          "default": 67108864,
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 268435456
+        },
+        "max_files": {
+          "default": 256,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1024
+        }
+      },
+      "required": [
+        "max_patch_bytes",
+        "max_file_bytes",
+        "max_total_file_bytes",
+        "max_files"
+      ],
+      "additionalProperties": false
+    },
+    "request_cache_entries": {
+      "default": 128,
+      "type": "integer",
+      "minimum": 8,
+      "maximum": 2048
+    },
+    "request_cache_ttl_ms": {
+      "default": 600000,
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 86400000
+    },
+    "max_http_body_bytes": {
+      "default": 8388608,
+      "type": "integer",
+      "minimum": 1024,
+      "maximum": 33554432
+    },
+    "log_level": {
+      "default": "info",
+      "type": "string",
+      "enum": [
+        "debug",
+        "info",
+        "warn",
+        "silent"
+      ]
+    }
+  },
+  "required": [
+    "transport",
+    "host",
+    "port",
+    "mcp_path",
+    "health_path",
+    "cwd",
+    "shell",
+    "exec",
+    "history",
+    "image",
+    "patch",
+    "request_cache_entries",
+    "request_cache_ttl_ms",
+    "max_http_body_bytes",
+    "log_level"
+  ],
+  "additionalProperties": false
+}

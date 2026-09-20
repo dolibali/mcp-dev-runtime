@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "runtime_version": "0.3.0",
+  "contract_version": "3.1",
+  "upstream": {
+    "repository": "https://github.com/openai/tunnel-client.git",
+    "commit": "70bb5a7e1305596f0216d7b18d0b7765d58576d5",
+    "source_version": "0.0.14",
+    "version_label": "0.0.14@70bb5a7",
+    "license": "Apache-2.0"
+  },
+  "preferred_variant": "tunnel-client-runtime",
+  "submodule_path": "vendor/tunnel-client",
+  "artifacts": {},
+  "compatibility": {
+    "macos_arm64": {
+      "runtime_tests": "168 passed (104 unit, 32 protocol, 32 launcher)",
+      "deployed_checks": "20 passed",
+      "tunnel_runtime_readiness": "passed after 0.3.0 activation; existing pinned binary unchanged",
+      "hosted_chatgpt_tool_calls": "All six tools and the contract 3.1 optional arguments were verified through the refreshed ChatGPT connection.",
+      "recorded_at": "2026-09-20T09:25:37.764Z"
+    },
+    "linux_x64": "CI configured; not yet executed on GitHub",
+    "windows_native": "not supported"
+  },
+  "notes": [
+    "Project releases and upstream releases use independent versions.",
+    "The commit is newer than the v0.0.14 tag; matching the tag number alone is insufficient.",
+    "No public prebuilt artifact is declared verified for this exact source pin. Reuse a matching local binary or build the optional pinned source.",
+    "Local build receipts record the actual binary SHA-256 without claiming an official upstream release signature."
+  ]
+}

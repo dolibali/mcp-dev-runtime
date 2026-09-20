@@ -1,0 +1,85 @@
+{
+  "name": "mcp-dev-runtime",
+  "version": "0.3.0",
+  "description": "Local development tools over MCP: shell, terminal sessions, patches and images. No agent or model calls.",
+  "scripts": {
+    "setup": "bash ./install.sh",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "test": "npm run build && node --test tests/unit/*.test.mjs",
+    "test:protocol": "npm run build && node --test tests/protocol/*.test.mjs",
+    "test:all": "npm run test && npm run test:protocol && npm run test:launcher",
+    "benchmark": "npm run build && node tests/benchmark/run.mjs",
+    "postinstall": "node scripts/prepare-pty.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "contracts": "npm run build && node scripts/export-contracts.mjs",
+    "prepack": "npm run build",
+    "verify:cli": "npm run build && node scripts/verify-cli.mjs",
+    "verify:deployed": "node scripts/verify-deployed.mjs",
+    "up": "node dist/launcher/cli.js up",
+    "down": "node dist/launcher/cli.js down",
+    "status": "node dist/launcher/cli.js status",
+    "tunnel:setup": "node dist/launcher/cli.js tunnel-setup",
+    "test:launcher": "npm run build && node --test tests/launcher/*.test.mjs",
+    "release:check": "npm run build && node scripts/release-check.mjs",
+    "release:source": "npm run release:check && node scripts/source-archive.mjs",
+    "version": "node scripts/sync-version.mjs",
+    "versions:sync": "node scripts/sync-version.mjs"
+  },
+  "keywords": [
+    "mcp",
+    "developer-tools",
+    "terminal",
+    "local-development",
+    "chatgpt",
+    "secure-mcp-tunnel"
+  ],
+  "author": "",
+  "license": "Apache-2.0",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@modelcontextprotocol/node": "2.0.0",
+    "@modelcontextprotocol/server": "2.0.0",
+    "node-pty": "1.1.0",
+    "sharp": "0.35.4",
+    "zod": "4.6.5",
+    "@modelcontextprotocol/client": "2.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.2",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "bin": {
+    "mcp-dev-runtime": "dist/launcher/cli.js",
+    "local-dev-mcp": "dist/main.js"
+  },
+  "files": [
+    "install.sh",
+    "dist",
+    "contracts",
+    "scripts/setup.mjs",
+    "scripts/prepare-pty.mjs",
+    "README.md",
+    "docs",
+    "LICENSE",
+    "NOTICE",
+    "THIRD_PARTY_NOTICES.md",
+    "reference/codex/LICENSE",
+    "tunnel.lock.json",
+    "config.example.json",
+    "launcher.config.example.json",
+    ".env.example",
+    "scripts/doctor.mjs",
+    "scripts/smoke.mjs",
+    "scripts/verify-deployed.mjs"
+  ],
+  "os": [
+    "darwin",
+    "linux"
+  ]
+}

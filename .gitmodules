@@ -1,0 +1,3 @@
+[submodule "vendor/tunnel-client"]
+	path = vendor/tunnel-client
+	url = https://github.com/openai/tunnel-client.git
