@@ -97,6 +97,8 @@ Keep the default listener on `127.0.0.1`; do not expose this unrestricted runtim
 
 **Checkpoint:** the script ends with `MCP Dev Runtime setup complete` and the offline diagnostic passes. This confirms local installation, not a live ChatGPT connection.
 
+Setup also registers `~/.local/bin/mcp-dev-runtime`. If it prints a PATH instruction, apply that instruction before using the global command; otherwise the existing `npm run ...` commands below remain usable from this repository. Registration never changes your shell profiles or starts a service. See [global command usage](../README.md#global-command).
+
 <a id="step-3"></a>
 ## Step 3 — Create a Tunnel and find its real ID
 
@@ -219,6 +221,8 @@ You do not have to run two more `curl` commands after a successful `doctor` chec
 Keep the computer awake, online, and running the services while proceeding. Background startup is not boot-service installation and does not keep a sleeping computer online. These are local checks; the complete ChatGPT-to-computer round trip is still untested.
 
 **Checkpoint:** both MCP and Tunnel are ready, with successful diagnostics.
+
+For daily checks from **any terminal directory**, use `mcp-dev-runtime status`, `mcp-dev-runtime doctor` and `mcp-dev-runtime smoke`. To start with just `mcp-dev-runtime up --background`, first merge `"env_file": "runtime.env"` into the existing launcher configuration; do not overwrite the file. `mcp-dev-runtime down` stops the selected managed instance and its owned tasks, so it is not a read-only check.
 
 <a id="step-7"></a>
 ## Step 7 — Create the ChatGPT app and choose Connection: Tunnel

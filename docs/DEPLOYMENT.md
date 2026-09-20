@@ -37,6 +37,10 @@ Before applying changes, inspect active tasks: `down` stops owned commands. Stop
 
 ## Initial setup versus normal startup
 
+Successful setup also registers the current user's command in `~/.local/bin`, unless `--no-global-command` is specified. Existing deployments may run `npm run command:install` without re-running setup or restarting a service. Registration reuses this checkout and its Node executable; it is not another installation and does not edit shell profiles. [English global command guide](../README.md#global-command) / [中文说明](README.zh-CN.md#global-command).
+
+For management commands (`up`, `down`, `status`, `doctor`, `smoke`, `history-clear`), the CLI first resolves explicit relative file/directory flags against the caller's directory, then uses the installation root as its working-directory base. This aligns doctor/history with the MCP child already launched from that root. `serve` retains caller-cwd semantics. Paths stored inside launcher JSON still resolve against that JSON file. The global `smoke` command follows the selected runtime configuration; `npm run smoke` remains the lower-level URL-based script.
+
 The recommended first-run path is `./install.sh` (or `npm run setup`). It installs the locked npm dependencies, builds the runtime, creates local configuration only when absent, then reuses a compatible Tunnel binary or fetches/builds the exact source pinned by `tunnel.lock.json`. Use `--local-only` to omit Tunnel preparation and `--force-tunnel-build` only for a deliberate rebuild. The installer does not install system packages or provision Platform Tunnel records/credentials.
 
 Repeated setup preserves `config.json`, `launcher.config.json` and `runtime.env`. A package-lock fingerprint under ignored `.runtime/setup/` lets it skip `npm ci` after a known-good dependency install. If dependencies have to be replaced while the local supervisor state points at a live managed process, setup refuses the refresh rather than changing `node_modules` underneath that process.

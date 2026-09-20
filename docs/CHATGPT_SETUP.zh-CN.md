@@ -97,6 +97,8 @@ cd mcp-dev-runtime
 
 **本步完成标志：**脚本最后显示 `MCP Dev Runtime setup complete`，离线诊断通过。这里只证明本地安装完成，还没有证明 ChatGPT 已经能连到电脑。
 
+安装器还会注册 `~/.local/bin/mcp-dev-runtime`。如果它提示补充 PATH，先按提示操作，再使用全局命令；下面原有的 `npm run ...` 命令仍可在仓库目录使用。注册不会修改 Shell 启动文件，也不会自动启动服务。详见[全局命令使用说明](README.zh-CN.md#global-command)。
+
 <a id="step-3"></a>
 ## 第 3 步：创建 Tunnel，找到真正的 Tunnel ID
 
@@ -219,6 +221,8 @@ npm run smoke
 保持电脑开机联网和服务运行，再去下一步。后台启动不等于系统开机自启，也不能让睡眠中的电脑持续在线。上述只是本地检查，尚未证明 ChatGPT 到本机的完整调用成功。
 
 **本步完成标志：**MCP、Tunnel 都就绪，诊断通过。
+
+日常可在**任意终端目录**运行 `mcp-dev-runtime status`、`mcp-dev-runtime doctor` 和 `mcp-dev-runtime smoke`。只用 `mcp-dev-runtime up --background` 启动前，先把 `"env_file": "runtime.env"` 合并进已有启动器配置，不要覆盖整个文件。`mcp-dev-runtime down` 会停止对应受管实例及其任务，不是只读检查命令。
 
 <a id="step-7"></a>
 ## 第 7 步：在 ChatGPT 创建应用，Connection 选 Tunnel

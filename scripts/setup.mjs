@@ -5,10 +5,11 @@ import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { installCommand, printCommandResult } from './global-command.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const argv = process.argv.slice(2);
-const allowed = new Set(['--local-only', '--force-tunnel-build', '--help', '-h']);
+const allowed = new Set(['--local-only', '--force-tunnel-build', '--no-global-command', '--help', '-h']);
 for (const arg of argv) {
   if (!allowed.has(arg)) throw new Error(`Unknown setup option: ${arg}. Use --help for supported options.`);
 }
@@ -23,6 +24,7 @@ Usage:
 Options:
   --local-only          Install/build MCP Dev Runtime but skip Secure MCP Tunnel setup.
   --force-tunnel-build  Rebuild the exact Tunnel source pinned by tunnel.lock.json.
+  --no-global-command  Skip registration in ~/.local/bin (for CI or embedded use).
   --help, -h            Show this help.
 
 The setup never overwrites config.json, launcher.config.json, or runtime.env.
@@ -179,9 +181,15 @@ if (localOnly) {
 step('Running offline configuration diagnostics...');
 await run('npm', ['run', 'doctor', '--', '--config', 'config.json', '--offline']);
 
+if (!argv.includes('--no-global-command')) {
+  step('Registering the user-level mcp-dev-runtime command...');
+  printCommandResult(await installCommand());
+}
+
 console.log('');
 console.log('MCP Dev Runtime setup complete.');
 console.log(`Project: ${ROOT}`);
+if (!argv.includes('--no-global-command')) console.log('From any directory: mcp-dev-runtime --help / status / doctor / down');
 if (localOnly) {
   console.log('Next: start local HTTP with "npm start -- --config config.json", or configure stdio in your MCP client.');
 } else {

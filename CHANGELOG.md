@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Register a user-level `mcp-dev-runtime` command during setup, with an opt-out and standalone command-only install/remove operations. Preserve unrelated commands and report missing PATH entries; do not edit shell profiles or duplicate services.
+- Add global `doctor` and configuration-aware `smoke` subcommands. Resolve explicit path arguments from the caller while keeping managed configuration and working-directory bases attached to the installation; preserve local `serve`/stdio caller-directory behavior.
+
 ## 0.3.0 — 2026-09-20
 
 ### Added and changed

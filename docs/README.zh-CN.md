@@ -108,8 +108,46 @@ cd mcp-dev-runtime
 
 源码编译需要开发依赖，安装过程还会准备当前项目的原生 PTY 辅助程序；当前平台没有适用预编译包时仍可能需要前面的系统编译依赖。`package.json` 中的 `private: true` 是为了防止误发到 **npm**，不妨碍在 GitHub 公开源码。不要假定运行 `npx mcp-dev-runtime` 就能安装到本项目。
 
+<a id="global-command"></a>
+### 在任意目录使用全局命令
+
+安装成功后，会在 `~/.local/bin/mcp-dev-runtime` 注册**当前用户的全局命令**。它仍使用同一份源码、Node 程序、Tunnel 缓存和配置，不会复制第二套运行时，也不需要 `sudo`。注册后不要删除源码目录或对应 Node 安装。
+
+已经装好的实例，可以只注册命令，不必重装依赖、修改凭据或重启服务：
+
+```bash
+npm run command:install
+```
+
+命令目录加入 PATH 后，不在源码目录也能执行：
+
+```bash
+mcp-dev-runtime --help
+mcp-dev-runtime --version
+mcp-dev-runtime status
+mcp-dev-runtime doctor
+mcp-dev-runtime doctor --json
+mcp-dev-runtime smoke
+```
+
+为了每次启动不用重新填写凭据文件路径，把 `"env_file": "runtime.env"` 合并到**已有的** `launcher.config.json` 中，保留其他设置；这个值是文件名，不是 API Key。之后在任意目录都可以运行 `mcp-dev-runtime up --background` 和 `mcp-dev-runtime down`。显式传入 `--env-file FILE` 时，相对路径按终端当前目录解析，必要时使用绝对路径。注册命令本身不读取或修改 `runtime.env`，也不启动或停止服务。
+
+管理命令读取安装目录的配置，并以该安装目录作为工作目录解析基准，不会误用当前其他项目里的同名文件。显式路径参数仍相对于调用目录。`mcp-dev-runtime serve` 则保留终端当前目录，供本地 HTTP / stdio 使用。全局 `smoke` 会根据选中的配置生成目标 URL；旧的 `npm run smoke` 在非默认端口时仍需显式传入 URL。
+
+如果 `~/.local/bin` 尚未加入 PATH，安装器会输出准确的 export 命令。使用默认目录时是：
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+把这行加入对应 Shell 的启动文件，可以让后续终端也生效；安装器**不会擅自修改** `.zshrc`、`.bashrc` 等文件。同名但不属于本项目的命令不会被覆盖；PATH 中有优先命令时会明确提示。入口使用注册时选定的 Node；主动删除或迁移该 Node 版本后，应使用兼容的新 Node 重新注册。
+
+只移除当前源码目录注册的命令，可在仓库中运行 `npm run command:uninstall`，不会删除配置、Tunnel、历史或停止服务。迁移源码目录前先移除入口，再从新位置注册；安装器不会默默把旧入口改指向另一份源码。高级安装可以指定 `npm run command:install -- --bin-dir /absolute/path/to/bin`，卸载时使用相同的 `--bin-dir`。CI 或嵌入式部署不需要全局入口时，用 `./install.sh --no-global-command` 跳过注册。
+
 <a id="npm-arguments"></a>
 **命令中间的 `--` 是什么意思？** 在 `npm run doctor -- --json` 中，`npm run doctor` 选择本项目的诊断脚本，单独的 `--` 告诉 npm 将后面的参数传给脚本，`--json` 才是脚本的输出选项。这不是笔误，也不是可以随意删除的多余横线。日常人工检查直接运行 `npm run doctor` 即可；需要脚本输出 JSON 时再加 `-- --json`。它调用的脚本是 `node scripts/doctor.mjs --json`；直接使用 Node 时不需要 npm 的分隔符。参考 [npm 官方参数传递说明](https://docs.npmjs.com/cli/v12/commands/npm-run/)。
+
+全局命令不经过 npm，直接写 `mcp-dev-runtime doctor --json` 即可，不需要中间的分隔符。
 
 <a id="local"></a>
 ## 二 A、连接本地客户端

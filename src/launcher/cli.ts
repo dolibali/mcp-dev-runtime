@@ -3,7 +3,7 @@ import { parseArgs } from 'node:util';
 import { spawn } from 'node:child_process';
 import { mkdir, open, stat, rename, unlink } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { NAME, VERSION } from '../version.js';
 import { ROOT, options } from './options.js';
 import { current, stopManaged, supervise } from './supervisor.js';
@@ -17,6 +17,8 @@ Commands:
   up [--background]                   Start MCP and the locked Tunnel together
   status                              Show the managed instance
   down                                Stop only the managed instance
+  doctor [--json] [--offline]          Diagnose the installed runtime and selected configuration
+  smoke [URL]                         Discover tools and run one harmless command
   tunnel-setup [--build]               Check an installed binary or build pinned runtime
   versions                            Show project/tool-contract/Tunnel version pair
   history-clear --confirm              Clear this config's disk history while its writer is stopped
@@ -30,13 +32,59 @@ Options:
   --tunnel-health-port PORT            Default 9098
   --ready-timeout-ms NUMBER            Default 30000
 Windows native is not supported. No Codex, Agent or model API is invoked.
+Management commands use this installation's configuration and working-directory base.
+Explicit relative path flags resolve from the caller's directory; serve keeps caller cwd.
 `;
+const pathFlags = new Set(['--launcher-config','--config','--tunnel-bin','--state-dir','--env-file']);
+function absolutePathArgs(args: string[]): string[] {
+  const result = [...args];
+  for (let i = 0; i < result.length; i++) {
+    const arg = result[i]!;
+    const equals = arg.indexOf('=');
+    if (equals > 0 && pathFlags.has(arg.slice(0, equals))) {
+      const value = arg.slice(equals + 1);
+      if (!value) throw new Error(`Missing path for ${arg.slice(0, equals)}`);
+      result[i] = arg.slice(0, equals + 1) + path.resolve(value);
+    } else if (pathFlags.has(arg)) {
+      const value = result[i + 1];
+      if (!value || value.startsWith('--')) throw new Error(`Missing path for ${arg}`);
+      result[++i] = path.resolve(value);
+    }
+  }
+  return result;
+}
+async function runScript(name: string, args: string[]) {
+  const file = path.join(ROOT,'scripts',name);
+  process.argv = [process.execPath,file,...args];
+  await import(pathToFileURL(file).href);
+}
 async function main(){
-  const [command,...args]=process.argv.slice(2);
+  const [command,...originalArgs]=process.argv.slice(2);
   if(!command||command==='--help'||command==='-h'){console.log(help);return;}
   if(command==='--version'){console.log(`${NAME} ${VERSION}`);return;}
   if(command==='serve'){
-    process.argv=[process.argv[0]!,path.join(ROOT,'dist','main.js'),...args];await import('../main.js');return;
+    process.argv=[process.argv[0]!,path.join(ROOT,'dist','main.js'),...originalArgs];await import('../main.js');return;
+  }
+  if(originalArgs.includes('--help')||originalArgs.includes('-h')){console.log(help);return;}
+  // Resolve user-provided paths before switching the management cwd. The MCP
+  // child already starts from ROOT; doctor and history-clear must use that same base.
+  const args = absolutePathArgs(originalArgs);
+  process.chdir(ROOT);
+  if(command==='doctor'){
+    parseArgs({args,options:{config:{type:'string'},'launcher-config':{type:'string'},json:{type:'boolean'},offline:{type:'boolean'}}});
+    await runScript('doctor.mjs',args);return;
+  }
+  if(command==='smoke'){
+    const {values,positionals}=parseArgs({args,allowPositionals:true,options:{config:{type:'string'},'launcher-config':{type:'string'}}});
+    if(positionals.length>1)throw new Error('smoke accepts at most one endpoint URL.');
+    let url=positionals[0];
+    if(!url){
+      const o=await options(values['launcher-config']);
+      const c=await loadConfig(values.config??o.runtime_config);
+      if(c.transport!=='http')throw new Error('smoke requires HTTP configuration or an explicit URL.');
+      url=`http://${c.host.includes(':')?'['+c.host+']':c.host}:${c.port}${c.mcp_path}`;
+    }
+    await runScript('smoke.mjs',[url]);return;
   }
   const {values}=parseArgs({args,options:{
     'launcher-config':{type:'string'},config:{type:'string'},'tunnel-bin':{type:'string'},

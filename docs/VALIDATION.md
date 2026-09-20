@@ -1,6 +1,14 @@
 # 0.3.0 local validation record
 
-2026-09-20, macOS ARM64. Current `npm run test:all`: **168 passed** (104 unit, 32 protocol, 32 launcher), no failures or skips. CLI startup/cleanup, release checks and 20 deployed checks passed. A 45-second isolated four-worker workload completed 2003 commands and 179 health checks without unexpected failures, while exercising bounded history rotation.
+## Global-command update — 2026-09-20
+
+The global-command update passed **179 tests** (104 unit, 32 protocol, 43 launcher), with no failures or skips, plus the isolated production-CLI check. A clean source copy in a disposable HOME passed real `npm run setup -- --local-only`, command registration, cross-directory offline doctor, idempotent reinstallation and command-only removal. These checks used no real Tunnel credentials. Full managed up/status/doctor/smoke/down and stdio were exercised through the registered command in isolated installations; their Tunnel endpoint was an explicitly mocked local process.
+
+Regression cases cover spaces, quotes and Unicode paths, literal argument forwarding, missing or shadowed PATH entries, existing-command protection, symlink refusal, concurrent registration, command-only removal, a moved/missing build, caller-relative path flags, installation-relative managed configuration and preservation of caller cwd for stdio. The earlier full Tunnel build and deployed workload measurements below remain separate historical checkpoints, not newly rerun benchmarks for this command-registration change.
+
+## Earlier one-click installation checkpoint
+
+2026-09-20, macOS ARM64. `npm run test:all`: **168 passed** (104 unit, 32 protocol, 32 launcher), no failures or skips. CLI startup/cleanup, release checks and 20 deployed checks passed. A 45-second isolated four-worker workload completed 2003 commands and 179 health checks without unexpected failures, while exercising bounded history rotation.
 
 The one-click setup path was also exercised from a disposable source copy with no `node_modules`, no `.runtime` cache and no initialized Tunnel submodule. `./install.sh` installed the locked npm dependencies, built the runtime, created only missing local configuration, fetched OpenAI `tunnel-client` at the exact commit in `tunnel.lock.json`, built `tunnel-client-runtime`, verified the expected version/commit and SHA-256, then passed offline doctor. A second run preserved the existing configuration, skipped `npm ci`, and reused the verified Tunnel binary. Dedicated setup regressions additionally cover local-only mode, missing build prerequisites, active-runtime protection and `runtime.env` symlink refusal.
 

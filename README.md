@@ -108,8 +108,46 @@ The example config works from the repository root. To work elsewhere, edit `conf
 
 Development dependencies are needed for the build. The install path also prepares this checkout's native PTY helper; native packages may still require the platform build prerequisites listed above when no compatible prebuilt package exists. This repository is currently `private: true` in `package.json` to prevent accidental **npm publication**. It does not prevent GitHub source distribution; do not assume `npx mcp-dev-runtime` installs this project.
 
+<a id="global-command"></a>
+### Use the command from any directory
+
+After successful setup, a **user-level global command** is registered at `~/.local/bin/mcp-dev-runtime`. It uses the same checkout, Node executable, Tunnel cache and configuration; it does not copy a second runtime or require `sudo`. Keep the checkout and its Node installation in place.
+
+For an already installed instance, register only the command without reinstalling dependencies, changing credentials or restarting services:
+
+```bash
+npm run command:install
+```
+
+Once the directory is on PATH, these work outside the repository:
+
+```bash
+mcp-dev-runtime --help
+mcp-dev-runtime --version
+mcp-dev-runtime status
+mcp-dev-runtime doctor
+mcp-dev-runtime doctor --json
+mcp-dev-runtime smoke
+```
+
+For startup without typing the credentials path each time, merge `"env_file": "runtime.env"` into the **existing** `launcher.config.json` (do not replace the other settings). The value is a filename, not the API key. You can then use `mcp-dev-runtime up --background` and `mcp-dev-runtime down` from any directory. With explicit `--env-file FILE`, a relative FILE is resolved from the terminal's current directory; use an absolute path when appropriate. Registration itself never reads or changes `runtime.env` and never starts or stops a service.
+
+Management commands use the installed checkout's configuration and working-directory base, not another project's same-named files. Explicit path flags remain caller-relative. `mcp-dev-runtime serve` is different: it keeps the caller's working directory for local HTTP/stdio use. Global `smoke` derives its URL from the selected configuration; the older `npm run smoke` script still takes an explicit URL for nondefault ports.
+
+If `~/.local/bin` is not on PATH, the installer prints the exact export to run. For the default directory:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Add that line to the relevant shell startup file for future terminals; the installer does **not** modify `.zshrc`, `.bashrc` or other profiles. An existing unrelated command is never overwritten. A command earlier on PATH is reported rather than silently replaced. Each registered wrapper uses the Node selected at registration; after intentionally removing/moving that Node version, register again with the desired compatible Node.
+
+Remove just this checkout's command with `npm run command:uninstall` from the repository. Configurations, Tunnel, history and running services remain untouched. Unregister before moving the checkout, then register from its new location; an old entry is not silently reassigned to a different source root. Advanced installations can use `npm run command:install -- --bin-dir /absolute/path/to/bin` and the same `--bin-dir` when uninstalling. Use `./install.sh --no-global-command` for CI or embedded installs that must not register a command.
+
 <a id="npm-arguments"></a>
 **Why is there a separate `--`?** In `npm run doctor -- --json`, `npm run doctor` selects this project's diagnostic script, the standalone `--` tells npm to forward the following arguments, and `--json` is an option for that script. It is not a typo or an extra dash to remove. For normal interactive checks, simply use `npm run doctor`; add `-- --json` when you need the script's JSON output. The script invocation is `node scripts/doctor.mjs --json`; direct Node invocation does not need npm's separator. See the [official npm argument-passing reference](https://docs.npmjs.com/cli/v12/commands/npm-run/).
+
+The global command does not go through npm: use `mcp-dev-runtime doctor --json`, with no extra separator.
 
 <a id="local"></a>
 ## 2A. Connect a local client

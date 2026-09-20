@@ -20,6 +20,11 @@ async function fixture(t, { tunnelInitiallyReady = false, tools = ['git', 'make'
   t.after(() => rm(root, { recursive: true, force: true }));
   await mkdir(path.join(root, 'scripts'), { recursive: true });
   await copyFile(sourceSetup, path.join(root, 'scripts', 'setup.mjs'));
+  await copyFile(path.resolve('scripts/global-command.mjs'), path.join(root, 'scripts', 'global-command.mjs'));
+  // This test suite never writes to the maintainer's actual global bin directory.
+  const home = path.join(root, 'test-home'); await mkdir(home);
+  await mkdir(path.join(root, 'dist', 'launcher'), { recursive: true });
+  await writeFile(path.join(root, 'dist', 'launcher', 'cli.js'), '// Test-only built entry point\n');
   await writeFile(path.join(root, 'package-lock.json'), '{"lockfileVersion":3}\n');
   await writeFile(path.join(root, 'config.example.json'), '{"transport":"http","host":"127.0.0.1","port":3001,"cwd":".","shell":"/bin/bash"}\n');
   await writeFile(path.join(root, 'launcher.config.example.json'), '{"runtime_config":"config.json","state_dir":".runtime","tunnel_health_port":9098}\n');
@@ -47,6 +52,7 @@ process.exit(0);
   }
   const env = {
     ...process.env,
+    HOME: home,
     PATH: bin,
     SETUP_TEST_ROOT: root,
     SETUP_TEST_LOG: log
@@ -54,13 +60,14 @@ process.exit(0);
   const run = (args = []) => exec(process.execPath, [path.join(root, 'scripts', 'setup.mjs'), ...args], {
     cwd: root, env, timeout: 15000, maxBuffer: 1024 * 1024
   });
-  return { root, bin, log, env, run };
+  return { root, bin, log, env, run, home };
 }
 
 test('setup: first full install builds pinned Tunnel path and creates private config without overwriting on rerun', async t => {
   const f = await fixture(t);
   const first = await f.run();
   assert.match(first.stdout, /setup complete/i);
+  assert.equal((await stat(path.join(f.home, '.local/bin/mcp-dev-runtime'))).mode & 0o777, 0o755);
   assert.equal(await readFile(path.join(f.root, 'config.json'), 'utf8'), await readFile(path.join(f.root, 'config.example.json'), 'utf8'));
   assert.equal(await readFile(path.join(f.root, 'launcher.config.json'), 'utf8'), await readFile(path.join(f.root, 'launcher.config.example.json'), 'utf8'));
   assert.equal((await stat(path.join(f.root, 'runtime.env'))).mode & 0o777, 0o600);
@@ -82,6 +89,12 @@ test('setup: first full install builds pinned Tunnel path and creates private co
   calls = (await readFile(f.log, 'utf8')).trim().split('\n');
   assert.equal(calls.filter(x => x === 'ci --include=dev').length, 1);
   assert.equal(calls.filter(x => x === 'run tunnel:setup -- --build').length, 1);
+});
+
+test('setup: embedded mode leaves the user global command directory untouched', async t => {
+  const f = await fixture(t, { tools: [] });
+  await f.run(['--local-only', '--no-global-command']);
+  await assert.rejects(stat(path.join(f.home, '.local/bin')), { code: 'ENOENT' });
 });
 
 test('setup: local-only path never requires or invokes Tunnel build tools', async t => {
