@@ -214,7 +214,7 @@ npm run doctor
 npm run smoke
 ```
 
-检查 `doctor` 是否显示 `PASS`，其中 `runtime.ok`、`protocol.ok` 为 true，对应受管实例的 `health.availability` 为 `ready`；各项工具链结果和历史告警也要看。`smoke` 应显示 `LOCAL MCP SMOKE PASSED`。按上文创建标准配置文件后，`doctor` 会读取选中的配置，日常诊断不用手动输入端口。需要查看生命周期详情时，还可以运行 `npm run status`。
+检查 `doctor` 是否显示 `PASS`，其中 `runtime.ok`、`protocol.ok` 为 true，对应受管实例的 `health.availability` 为 `ready`；各项工具链结果和历史告警也要看。`smoke` 应显示 `LOCAL MCP SMOKE PASSED`。按上文创建标准配置文件后，`doctor` 会读取选中的配置，日常诊断不用手动输入端口。`npm run status` 默认给出简洁摘要；需要更多细节时加 `-- --verbose`，需要完整机器可读状态时加 `-- --json`。
 
 **默认端口：**本地 MCP 使用 `127.0.0.1:3001`，Tunnel 的独立健康监听使用 `127.0.0.1:9098`。没有冲突就保持默认；冲突时修改 `config.json` 中对应的 `port`，或 `launcher.config.json` 中的 `tunnel_health_port`，保留回环监听，确认没有需要保留的活动任务后再重启。两个端口要未被占用且互不相同，改过 MCP 地址后也要向 `smoke` 传入新 URL。Tunnel ID 不会因此改变。详见[端口调整步骤](DEPLOYMENT.md#ports)。
 
@@ -224,7 +224,7 @@ npm run smoke
 
 **本步完成标志：**MCP、Tunnel 都就绪，诊断通过。
 
-日常可在**任意终端目录**运行 `mcp-dev-runtime status`、`mcp-dev-runtime doctor` 和 `mcp-dev-runtime smoke`。只用 `mcp-dev-runtime up --background` 启动前，先把 `"env_file": "runtime.env"` 合并进已有启动器配置，不要覆盖整个文件。`mcp-dev-runtime down` 会停止对应受管实例及其任务，不是只读检查命令。
+安装时成功注册短命令后，日常可在**任意终端目录**运行 `mdr status`、`mdr doctor` 和 `mdr smoke`（长命令 `mcp-dev-runtime` 完全等价）。需要更多运行细节时用 `mdr status --verbose`，只有需要完整对象时才用 `mdr status --json`。只用 `mdr up --background` 启动前，先把 `"env_file": "runtime.env"` 合并进已有启动器配置，不要覆盖整个文件。`mdr down` 会停止对应受管实例及其任务，不是只读检查命令。
 
 <a id="step-7"></a>
 ## 第 7 步：在 ChatGPT 创建应用，Connection 选 Tunnel

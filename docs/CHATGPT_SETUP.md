@@ -214,7 +214,7 @@ npm run doctor
 npm run smoke
 ```
 
-Check that `doctor` reports `PASS`, `runtime.ok` and `protocol.ok` are true, and the managed supervisor's `health.availability` is `ready`. Inspect toolchain results and history warnings too. `smoke` should report `LOCAL MCP SMOKE PASSED`. With the standard configuration files created above, `doctor` reads the selected configuration, so you do not need to type port numbers for routine diagnostics. `npm run status` remains available for lifecycle details.
+Check that `doctor` reports `PASS`, `runtime.ok` and `protocol.ok` are true, and the managed supervisor's `health.availability` is `ready`. Inspect toolchain results and history warnings too. `smoke` should report `LOCAL MCP SMOKE PASSED`. With the standard configuration files created above, `doctor` reads the selected configuration, so you do not need to type port numbers for routine diagnostics. `npm run status` gives a short daily summary; add `-- --verbose` for more detail or `-- --json` for the full machine-readable state.
 
 **Default ports:** local MCP uses `127.0.0.1:3001`; Tunnel's separate health listener uses `127.0.0.1:9098`. Keep them unless they conflict with an existing service. On a conflict, change the affected `port` in `config.json` or `tunnel_health_port` in `launcher.config.json`, preserve loopback binding, and restart only after checking active work. Use distinct, unused ports and pass a changed MCP URL to `smoke`. The Tunnel ID does not change. [Port-change procedure](DEPLOYMENT.md#ports).
 
@@ -224,7 +224,7 @@ Keep the computer awake, online, and running the services while proceeding. Back
 
 **Checkpoint:** both MCP and Tunnel are ready, with successful diagnostics.
 
-For daily checks from **any terminal directory**, use `mcp-dev-runtime status`, `mcp-dev-runtime doctor` and `mcp-dev-runtime smoke`. To start with just `mcp-dev-runtime up --background`, first merge `"env_file": "runtime.env"` into the existing launcher configuration; do not overwrite the file. `mcp-dev-runtime down` stops the selected managed instance and its owned tasks, so it is not a read-only check.
+For daily checks from **any terminal directory**, use `mdr status`, `mdr doctor` and `mdr smoke` when the short command was registered (the long `mcp-dev-runtime` forms are equivalent). Use `mdr status --verbose` for additional operational detail and `mdr status --json` only when the complete object is needed. To start with just `mdr up --background`, first merge `"env_file": "runtime.env"` into the existing launcher configuration; do not overwrite the file. `mdr down` stops the selected managed instance and its owned tasks, so it is not a read-only check.
 
 <a id="step-7"></a>
 ## Step 7 — Create the ChatGPT app and choose Connection: Tunnel

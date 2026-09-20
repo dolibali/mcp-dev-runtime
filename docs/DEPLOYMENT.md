@@ -83,7 +83,7 @@ npm run doctor
 npm run smoke
 ```
 
-From the checkout, `doctor` resolves `launcher.config.json` and its runtime config, falling back to the package-local `config.json` when present. `npm run status` is an optional lifecycle check and includes `health.availability`, a checked timestamp and component details; lifecycle `state=ready` alone does not establish current reachability. Default health probes run every five seconds, and sufficiently stale status queries trigger a refresh.
+From the checkout, `doctor` resolves `launcher.config.json` and its runtime config, falling back to the package-local `config.json` when present. `npm run status` is a concise lifecycle/readiness summary; use `npm run status -- --verbose` for operational details or `npm run status -- --json` for the complete supervisor object, including timestamps and component health. Lifecycle `state=ready` alone does not establish current reachability. Default health probes run every five seconds, and sufficiently stale status queries trigger a refresh.
 
 `doctor` checks local configuration, toolchains, fresh health and actual six-tool discovery/schema consistency without running user tasks. `--offline` skips connectivity checks. Neither local readiness nor an SDK test proves the ChatGPT round trip; scan tools and perform a harmless call in the actual client as a separate step. For custom launcher configuration, pass `--launcher-config FILE` to doctor and the lifecycle commands.
 
@@ -113,7 +113,7 @@ When a proxy is required, preserve loopback exclusions with `NO_PROXY=localhost,
 
 ## State, history and diagnostic logs
 
-For the file-by-file directory table and `tail -F` examples, see [README log instructions](../README.md#logs) / [中文日志目录与查看方法](README.zh-CN.md#logs). On a reachable managed instance, `mcp-dev-runtime status` (or registered `mdr status`) exposes absolute service log paths in `logs[].file`.
+For the file-by-file directory table and `tail -F` examples, see [README log instructions](../README.md#logs) / [中文日志目录与查看方法](README.zh-CN.md#logs). On a reachable managed instance, plain `mcp-dev-runtime status` / `mdr status` shows the log directory; `status --json` exposes absolute service log paths in `logs[].file`.
 
 The default `.runtime/` directory contains supervisor state, locks, a private control socket, Tunnel build caches and diagnostic logs. Disk execution history instead defaults to `.mcp-dev-runtime/history` relative to runtime `cwd`; configuring `.runtime/history` is an explicit deployment choice, not an automatic relocation.
 

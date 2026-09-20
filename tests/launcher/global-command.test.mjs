@@ -255,10 +255,23 @@ test('global CLI: default config, doctor, smoke, repeat up and down address one 
   assert.equal(first.state, 'ready');
   const short = await withPath(f.binDir, () => installCommand({ ...f, name: 'mdr' }));
   const shortRun = args => exec(short.path, args, { cwd: f.caller, env: f.env, timeout: 25000 });
-  const shortState = JSON.parse((await shortRun(['status'])).stdout);
+  const concise = (await shortRun(['status'])).stdout;
+  assert.match(concise, /mcp-dev-runtime 0\.3\.0/);
+  assert.match(concise, /Status\s+ready/);
+  assert.match(concise, /MCP\s+ready\s+http:\/\/127\.0\.0\.1:/);
+  assert.match(concise, /Tunnel\s+ready/);
+  assert.match(concise, /Sessions\s+0 \/ 8 active/);
+  assert(concise.includes(f.state));
+  assert(!concise.includes('tunnel_sha256'));
+  const verbose = (await shortRun(['status', '--verbose'])).stdout;
+  assert.match(verbose, /Lifecycle\s+ready/);
+  assert.match(verbose, /MCP PID\s+\d+/);
+  assert.match(verbose, /Tunnel ver\.\s+0\.0\.14 git sha: 70bb5a7/);
+  const shortState = JSON.parse((await shortRun(['status', '--json'])).stdout);
   assert.equal(shortState.run_id, first.run_id);
   assert.equal(shortState.mcp_instance, first.mcp_instance);
   assert.deepEqual(shortState.logs.map(s => s.file).sort(), [path.join(f.state, 'mcp.log'), path.join(f.state, 'tunnel.log')]);
+  await assert.rejects(shortRun(['status', '--verbose', '--json']), /either --verbose or --json/);
   const shortDoctor = JSON.parse((await shortRun(['doctor', '--json'])).stdout);
   assert.equal(shortDoctor.ok, true); assert.equal(shortDoctor.supervisor.run_id, first.run_id);
   assert.match((await shortRun(['smoke'])).stdout, /LOCAL MCP SMOKE PASSED/);
@@ -268,7 +281,7 @@ test('global CLI: default config, doctor, smoke, repeat up and down address one 
   assert.equal(d.ok, true); assert.equal(d.cwd, f.root); assert.equal(d.protocol.commands_executed, 0);
   assert.equal(d.supervisor.run_id, first.run_id);
   assert.match((await f.run(['smoke'])).stdout, /LOCAL MCP SMOKE PASSED/);
-  assert.equal(JSON.parse((await f.run(['status'])).stdout).run_id, first.run_id);
+  assert.equal(JSON.parse((await f.run(['status', '--json'])).stdout).run_id, first.run_id);
   assert.equal(JSON.parse((await f.run(['down'], f.dir)).stdout).state, 'stopped');
 });
 

@@ -1,5 +1,9 @@
 # 0.3.0 local validation record
 
+## Status output modes — 2026-09-20
+
+The launcher CLI now defaults to a concise human-readable `status` view, with `--verbose` for operational detail and `--json` preserving the previous complete supervisor object. The registered `mdr` entry was exercised against the existing managed macOS instance from outside the repository: concise output reported ready MCP/Tunnel state, session/history counts, uptime and the resolved log directory; verbose output added process IDs, instance IDs, latencies, memory, retained output, history size and Tunnel version; JSON retained `run_id`, component PIDs and log objects. No service restart was required because the wrapper resolves the rebuilt CLI entrypoint.
+
 ## Automatic mdr registration and log documentation — 2026-09-20
 
 This update passed **188 tests** (104 unit, 32 protocol, 52 launcher), with no failures or skips, plus the isolated production-CLI verification. Normal setup now registers `mcp-dev-runtime` first and automatically registers `mdr` only when the short name is conflict-free. A short-name conflict skips only `mdr`; setup still completes successfully with the canonical command. Explicit `command:install -- --name mdr` remains strict. Regressions cover coexistence, independent removal, literal arguments, same-name executable conflicts before and after the destination on PATH, foreign destination files/symlinks, supported-name validation, canonicalized PATH entries, CLI registration and setup-level conflict skipping. Test fixtures use private temporary directories and do not invoke foreign commands to identify them.

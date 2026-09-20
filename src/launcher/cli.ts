@@ -15,7 +15,7 @@ const help=`${NAME} ${VERSION}
 Commands:
   serve [--transport http|stdio ...]   Run the MCP server without Tunnel
   up [--background]                   Start MCP and the locked Tunnel together
-  status                              Show the managed instance
+  status [--verbose|--json]           Show the managed instance
   down                                Stop only the managed instance
   doctor [--json] [--offline]          Diagnose the installed runtime and selected configuration
   smoke [URL]                         Discover tools and run one harmless command
@@ -31,6 +31,8 @@ Options:
   --shell-env                          Load login-shell configuration only when keys missing
   --tunnel-health-port PORT            Default 9098
   --ready-timeout-ms NUMBER            Default 30000
+  --verbose                            Detailed human-readable status
+  --json                               Full machine-readable status/doctor output
 Windows native is not supported. No Codex, Agent or model API is invoked.
 Management commands use this installation's configuration and working-directory base.
 Explicit relative path flags resolve from the caller's directory; serve keeps caller cwd.
@@ -57,6 +59,61 @@ async function runScript(name: string, args: string[]) {
   const file = path.join(ROOT,'scripts',name);
   process.argv = [process.execPath,file,...args];
   await import(pathToFileURL(file).href);
+}
+type StatusRecord = Record<string, any>;
+function duration(seconds: unknown): string {
+  if(typeof seconds!=='number'||!Number.isFinite(seconds)||seconds<0)return 'unknown';
+  const whole=Math.floor(seconds),days=Math.floor(whole/86400),hours=Math.floor((whole%86400)/3600),minutes=Math.floor((whole%3600)/60);
+  if(days)return days+'d '+hours+'h';
+  if(hours)return hours+'h '+minutes+'m';
+  if(minutes)return minutes+'m '+(whole%60)+'s';
+  return whole+'s';
+}
+function bytes(value: unknown): string {
+  if(typeof value!=='number'||!Number.isFinite(value)||value<0)return 'unknown';
+  const units=['B','KiB','MiB','GiB'];let amount=value,unit=0;
+  while(amount>=1024&&unit<units.length-1){amount/=1024;unit++;}
+  return (unit===0?String(Math.round(amount)):amount.toFixed(amount>=10?1:2))+' '+units[unit];
+}
+function row(label: string, value: unknown): string {return label.padEnd(14)+String(value??'unknown');}
+function formatStatus(state: StatusRecord,stateDir:string,verbose=false): string {
+  const health=(state.health??{}) as StatusRecord,mcp=(health.mcp??{}) as StatusRecord,tunnel=(health.tunnel??{}) as StatusRecord;
+  const details=(mcp.details??{}) as StatusRecord,history=(details.history??{}) as StatusRecord;
+  const logs=Array.isArray(state.logs)?state.logs as StatusRecord[]:[];
+  const availability=health.availability??state.state??'unknown';
+  const mcpState=mcp.ok===true?'ready':mcp.ok===false?'degraded':'unknown';
+  const tunnelState=tunnel.ok===true?'ready':tunnel.ok===false?'degraded':'unknown';
+  const logDir=logs[0]?.file?path.dirname(String(logs[0].file)):stateDir;
+  const lines=[
+    NAME+' '+(state.version??VERSION),
+    '',
+    row('Status',availability),
+    row('MCP',mcpState+(state.mcp_url?'  '+state.mcp_url:'')),
+    row('Tunnel',tunnelState),
+    row('Sessions',details.active_sessions!==undefined?details.active_sessions+' / '+(details.max_active_sessions??'?')+' active':'unknown'),
+    row('History',history.records!==undefined?history.records+' records':'unknown'),
+    row('Uptime',duration(details.uptime_seconds)),
+    row('Logs',logDir)
+  ];
+  if(!verbose)return lines.join('\n');
+  lines.push(
+    '',
+    row('Lifecycle',state.state??'unknown'),
+    row('Managed',state.managed===true?'yes':state.managed===false?'no':'unknown'),
+    row('Run ID',state.run_id??'—'),
+    row('MCP instance',state.mcp_instance??'—'),
+    row('Supervisor',state.pid??'—'),
+    row('MCP PID',state.mcp_pid??'—'),
+    row('Tunnel PID',state.tunnel_pid??'—'),
+    row('MCP latency',typeof mcp.latency_ms==='number'?mcp.latency_ms.toFixed(2)+' ms':'unknown'),
+    row('Tunnel lat.',typeof tunnel.latency_ms==='number'?tunnel.latency_ms.toFixed(2)+' ms':'unknown'),
+    row('Memory',bytes(details.rss_bytes)),
+    row('Retained',details.retained_sessions!==undefined?details.retained_sessions+' sessions / '+bytes(details.retained_output_bytes)+' output':'unknown'),
+    row('History size',history.bytes!==undefined?bytes(history.bytes):'unknown'),
+    row('Tunnel ver.',state.tunnel_version??'unknown')
+  );
+  for(const log of logs)lines.push(row(path.basename(String(log.file??'log')),log.file??'unknown'));
+  return lines.join('\n');
 }
 async function main(){
   const [command,...originalArgs]=process.argv.slice(2);
@@ -86,6 +143,18 @@ async function main(){
     }
     await runScript('smoke.mjs',[url]);return;
   }
+  if(command==='status'){
+    const {values}=parseArgs({args,options:{
+      'launcher-config':{type:'string'},'state-dir':{type:'string'},verbose:{type:'boolean'},json:{type:'boolean'}
+    }});
+    if(values.verbose&&values.json)throw new Error('status accepts either --verbose or --json, not both.');
+    const overrides:Record<string,unknown>={};
+    if(values['state-dir']!==undefined)overrides.state_dir=path.resolve(values['state-dir']);
+    const o=await options(values['launcher-config'],overrides);
+    const state=await current(o.state_dir);
+    console.log(values.json?JSON.stringify(state,null,2):formatStatus(state,o.state_dir,values.verbose??false));
+    return;
+  }
   const {values}=parseArgs({args,options:{
     'launcher-config':{type:'string'},config:{type:'string'},'tunnel-bin':{type:'string'},
     'state-dir':{type:'string'},'env-file':{type:'string'},'shell-env':{type:'boolean'},
@@ -114,7 +183,6 @@ async function main(){
   }
   if(command==='versions'){console.log(JSON.stringify({project:NAME,version:VERSION,lock:await readLock()},null,2));return;}
   if(command==='tunnel-setup'){const r=values.build?await buildTunnel():await resolveTunnel(o.tunnel_bin);console.log(JSON.stringify(r,null,2));return;}
-  if(command==='status'){console.log(JSON.stringify(await current(o.state_dir),null,2));return;}
   if(command==='down'){console.log(JSON.stringify(await stopManaged(o.state_dir),null,2));return;}
   if(command!=='up')throw new Error(`Unknown command: ${command}`);
   const existing=await current(o.state_dir);
