@@ -14,9 +14,9 @@ import {Client,StreamableHTTPClientTransport} from '@modelcontextprotocol/client
 const exec=promisify(execFile),cli=path.resolve('dist/launcher/cli.js');
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function freePort(){return new Promise((resolve,reject)=>{const s=createServer();s.on('error',reject);s.listen(0,'127.0.0.1',()=>{const p=s.address().port;s.close(()=>resolve(p));});});}
-async function fixture(t,mode='normal'){
+async function fixture(t,mode='normal',readyTimeout=5000){
   const dir=await mkdtemp('/tmp/mdr-launch-');const config=path.join(dir,'config.json'),fake=path.join(dir,'tunnel-client-runtime');
-  const mp=await freePort(),tp=await freePort();
+  const mp=await freePort();let tp=await freePort();while(tp===mp)tp=await freePort();
   await writeFile(config,JSON.stringify({transport:'http',host:'127.0.0.1',port:mp,cwd:dir,shell:'/bin/bash',log_level:'silent'}));
   const stub=`#!${process.execPath}
 // Deterministic launcher test double. Never contacts OpenAI or runs a model.
@@ -27,12 +27,13 @@ if(${JSON.stringify(mode)}==='exit'){process.exit(7);}
 const a=args.find(x=>x.startsWith('--health.listen-addr='));const port=Number(a.split(':').at(-1));
 const s=http.createServer((q,r)=>{if(${JSON.stringify(mode)}==='not-ready'||(${JSON.stringify(mode)}==='toggle'&&require('node:fs').existsSync(${JSON.stringify(path.join(dir,'offline'))}))){r.writeHead(503);r.end('starting');}else r.end(q.url==='/readyz'?'ready':'live');});
 s.listen(port,'127.0.0.1');process.on('SIGTERM',()=>s.close(()=>process.exit(0)));
-if(${JSON.stringify(mode)}==='late-exit')setTimeout(()=>process.exit(8),1000);
+// Trigger the fault after the test observes ready, independently of runner speed.
+if(${JSON.stringify(mode)}==='late-exit')setInterval(()=>{if(require('node:fs').existsSync(${JSON.stringify(path.join(dir,'crash-now'))}))process.exit(8);},20);
 `;
   await writeFile(fake,stub,{mode:0o755});
   const stateDir=path.join(dir,'state');
   const launchConfig=path.join(dir,'launcher.json');await writeFile(launchConfig,JSON.stringify({shell_env:false}));
-  const args=['--launcher-config',launchConfig,'--config',config,'--state-dir',stateDir,'--tunnel-bin',fake,'--tunnel-health-port',String(tp),'--ready-timeout-ms','1200'];
+  const args=['--launcher-config',launchConfig,'--config',config,'--state-dir',stateDir,'--tunnel-bin',fake,'--tunnel-health-port',String(tp),'--ready-timeout-ms',String(readyTimeout)];
   const env={...process.env,CONTROL_PLANE_TUNNEL_ID:'tunnel_'+'0'.repeat(32),CONTROL_PLANE_API_KEY:'local-mock-test-key'};
   t.after(async()=>{try{await stopManaged(stateDir);}catch{}await rm(dir,{recursive:true,force:true});});
   const call=(cmd,extra=[])=>exec(process.execPath,[cli,cmd,...args,...extra],{env,timeout:25000,maxBuffer:262144});
@@ -90,7 +91,7 @@ test('launcher: occupied ports are refused and unrelated listeners remain alive'
  await assert.rejects(f.call('up'),e=>e.stderr.includes('already in use'));assert(listener.listening);assert.equal(await readState(f.stateDir),null);
 });
 test('launcher: readiness timeout stops the owned MCP sibling',async t=>{
- const f=await fixture(t,'not-ready');await assert.rejects(f.call('up'),e=>e.stderr.includes('Readiness timeout'));
+ const f=await fixture(t,'not-ready',1200);await assert.rejects(f.call('up'),e=>e.stderr.includes('Readiness timeout'));
  await assert.rejects(fetch(`http://127.0.0.1:${f.mp}/healthz`));assert.equal(await readState(f.stateDir),null);
 });
 test('launcher: failed Tunnel startup does not leave an orphan MCP',async t=>{
@@ -101,7 +102,7 @@ test('launcher: SIGTERM stops foreground supervisor and its two children',async 
  const f=await fixture(t);const c=await foreground(f,t);await waitState(f.stateDir);c.p.kill('SIGTERM');const end=await c.finished;assert.equal(end.code,0,end.text);assert.equal(await readState(f.stateDir),null);
 });
 test('launcher: child crash after ready triggers coordinated fail-stop',async t=>{
- const f=await fixture(t,'late-exit');const c=await foreground(f,t);await waitState(f.stateDir);const end=await c.finished;assert.equal(end.code,1);assert(end.text.includes('unexpectedly'));assert.equal(await readState(f.stateDir),null);
+ const f=await fixture(t,'late-exit');const c=await foreground(f,t);await waitState(f.stateDir);await writeFile(path.join(f.dir,'crash-now'),'crash the owned test double');const end=await c.finished;assert.equal(end.code,1);assert(end.text.includes('unexpectedly'));assert.equal(await readState(f.stateDir),null);
 });
 test('launcher: transient Tunnel readiness failure and recovery update live status without killing the MCP task',async t=>{
  const f=await fixture(t,'toggle');await f.call('up',['--background']);
