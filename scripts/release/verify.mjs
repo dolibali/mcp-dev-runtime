@@ -26,6 +26,24 @@ try {
   const unpacked = (await readdir(temp))[0];
   bundle = path.join(temp, "bundle 中文 ' space"); await rename(path.join(temp, unpacked), bundle);
   const manifest = await verifyBundle(bundle); pass('archive integrity, platform and relocatable internal symlinks');
+  // Validate the documentation users actually download, not just repository links.
+  for (const file of manifest.files.filter(f => f.type === 'file' && f.path.endsWith('.md') && !f.path.startsWith('app/node_modules/'))) {
+    const absolute = path.join(bundle, file.path), text = await readFile(absolute, 'utf8');
+    for (const [, href] of text.matchAll(/\]\(([^\s)]+)\)/g)) {
+      if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith('#')) continue;
+      const [rel, anchor] = href.split('#');
+      const target = path.resolve(path.dirname(absolute), decodeURIComponent(rel));
+      assert(target.startsWith(bundle + path.sep), 'Documentation link leaves the bundle: ' + href);
+      assert((await stat(target)).isFile(), 'Missing packaged documentation target: ' + href);
+      if (anchor && target.endsWith('.md')) {
+        const doc = await readFile(target, 'utf8');
+        const ids = [...doc.matchAll(/<a id="([^"]+)"/g)].map(m => m[1]);
+        const headings = [...doc.matchAll(/^#{1,6}\s+(.+)$/gm)].map(m => m[1].toLowerCase().replace(/[^\p{L}\p{N}_\- ]/gu, '').replaceAll(' ', '-'));
+        assert([...ids, ...headings].includes(decodeURIComponent(anchor)), 'Missing packaged documentation anchor: ' + href);
+      }
+    }
+  }
+  pass('packaged documentation links and anchors');
   app = path.join(bundle, 'app'); node = path.join(bundle, 'runtime', 'node'); entry = path.join(bundle, 'bin', 'mcp-dev-runtime');
   const home = path.join(temp, 'home'), guarded = path.join(temp, 'minimal-bin'), workspace = path.join(temp, 'work space');
   await Promise.all([mkdir(home), mkdir(guarded), mkdir(workspace)]);

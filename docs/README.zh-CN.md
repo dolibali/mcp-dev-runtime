@@ -510,7 +510,7 @@ grep -nEi -C 3 'error|failed|failure|exception|panic|timeout|timed out|ECONN|EAD
 
 关键词搜索不是错误判定器：没有命中不代表服务健康，`grep` 没有匹配时正常返回退出码 1；命中一个词也不一定代表服务不可用。保留前后上下文，对照出错操作的时间和当前 `doctor` 结果。改过状态目录时，使用下面说明的实际路径，不要继续照抄 `.runtime/`。不要直接分享 `runtime.env` 或完整私人日志，先检查并脱敏路径、命令内容、Tunnel ID 和秘密值。
 
-**改过目录时：**所选 `launcher.config.json` 的 `state_dir` 决定这些日志的路径。JSON 中的相对路径以该配置文件为基准，命令行 `--state-dir` 的相对路径以调用目录为基准。`up`、`status`、`down` 要使用相同的配置或覆盖项。普通 `mcp-dev-runtime status` / `mdr status` 会显示解析后的日志目录；`status --json` 会在 `logs[].file` 中给出 MCP / Tunnel 日志的绝对路径。自定义安装应以这些实际路径为准，不能继续假定是 `.runtime/`。
+**改过目录时：**所选 `launcher.config.json` 的 `logs_dir` 决定日志路径；源码或自定义配置未指定时，日志仍沿用 `state_dir`。JSON 中的相对路径以该配置文件为基准，命令行 `--state-dir` 的相对路径以调用目录为基准。`up`、`status`、`down` 要使用相同的配置或覆盖项。普通 `mcp-dev-runtime status` / `mdr status` 会显示解析后的日志目录；`status --json` 会在 `logs[].file` 中给出 MCP / Tunnel 日志的绝对路径。自定义安装应以这些实际路径为准，不能继续假定是 `.runtime/`。
 
 当前源码 checkout 有意把 `.runtime/` 放在项目目录中。预编译版已经把可变数据放在程序目录外，`mdr paths` 在两种模式下都只显示实际生效的目录。
 
@@ -551,7 +551,7 @@ MCP 与 Tunnel 的诊断日志按写入量轮转：启动器配置的 `log_max_b
 
 非默认端点可向 `smoke` 或 `verify:deployed` 传入地址，例如 `npm run smoke -- http://127.0.0.1:3011/mcp`。不要对无权控制的端点运行部署验收。
 
-2026-09-20 的 macOS ARM64 当前验证记录包括 **168 项回归测试、20 项部署检查、一次从干净临时目录完成的完整一键安装（含精确固定 Tunnel 构建），以及 45 秒隔离四路并发中的 2,003 条命令**，未出现意外失败。这是有日期的实测记录，不是可靠性或吞吐量保证。该轮没有直接验证物理睡眠唤醒、真实广域网断线、多日运行和断电持久性。详见 [VALIDATION.md](VALIDATION.md)。
+发行准备已通过 **195 项源码回归**和独立生产 CLI 验证。预编译流水线对实际压缩包进行原生验证，覆盖 **13 组安装包验收及 20 项真实工具检查**；最终证据随 Release 的 `VERIFICATION.json` 提供。[VALIDATION.md](VALIDATION.md) 中较早的压力和延迟数字是历史检查点，不是可靠性或吞吐量保证。安装包 CI 不代表已验证物理睡眠唤醒、真实广域网中断、多日运行或断电持久性。
 
 自动化测试不使用模型 API 或贡献者凭据。启动器测试使用明确标注的模拟 Tunnel，不代表已经连接 OpenAI。仓库包含 Ubuntu/macOS CI 和手动源码打包工作流。
 

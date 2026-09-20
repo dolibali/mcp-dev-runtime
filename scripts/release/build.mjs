@@ -76,7 +76,9 @@ try {
         const href = match[1]; if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith('#')) continue;
         const [targetPath, anchor] = href.split('#');
         const targetFile = path.resolve(path.dirname(file), decodeURIComponent(targetPath));
-        try { await lstat(targetFile); continue; } catch (e) { if (e.code !== 'ENOENT') throw e; }
+        // The short binary landing README intentionally has no source-guide anchors.
+        const landingAnchor = anchor && targetFile === path.join(bundle, 'README.md');
+        try { await lstat(targetFile); if (!landingAnchor) continue; } catch (e) { if (e.code !== 'ENOENT') throw e; }
         const rel = path.relative(bundle, targetFile).split(path.sep).join('/');
         if (rel.startsWith('../')) continue;
         const replacement = `https://github.com/dolibali/mcp-dev-runtime/blob/v${pkg.version}/${rel}` + (anchor ? '#' + anchor : '');
@@ -185,9 +187,12 @@ try {
     tunnel: { repository: tunnelLock.upstream.repository, commit: tunnelLock.upstream.commit, reported_version: reported, sha256: tunnelHash },
     signing, files: await inventory(bundle, { normalize: true }) };
   await writeFile(path.join(bundle, 'BUILD-MANIFEST.json'), JSON.stringify(manifest, null, 2) + '\n');
-  run(path.join(bundle, 'runtime', 'node'), ['--version']);
-  run(path.join(bundle, 'bin', 'mcp-dev-runtime'), ['--version']);
-  run(path.join(bundle, 'bin', 'mcp-dev-runtime'), ['tunnel-setup']);
+  const checkHome = path.join(work, 'check-home'); await mkdir(checkHome);
+  const checkEnv = { ...buildEnv, HOME: checkHome, XDG_CONFIG_HOME: path.join(checkHome, 'config'), XDG_STATE_HOME: path.join(checkHome, 'state'),
+    XDG_DATA_HOME: path.join(checkHome, 'data'), XDG_CACHE_HOME: path.join(checkHome, 'cache'), TUNNEL_BIN: '', NODE_OPTIONS: '' };
+  run(path.join(bundle, 'runtime', 'node'), ['--version'], work, checkEnv);
+  run(path.join(bundle, 'bin', 'mcp-dev-runtime'), ['--version'], work, checkEnv);
+  run(path.join(bundle, 'bin', 'mcp-dev-runtime'), ['tunnel-setup'], work, checkEnv);
   await mkdir(path.join(root, 'artifacts'), { recursive: true });
   const archive = path.join(root, 'artifacts', basename + '.tar.gz');
   run('tar', ['-czf', archive, '-C', work, basename], root, { ...process.env, COPYFILE_DISABLE: '1' });
