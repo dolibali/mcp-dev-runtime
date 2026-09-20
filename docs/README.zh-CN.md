@@ -12,6 +12,8 @@
 
 > **使用边界：**命令以服务所在的系统用户权限执行。本项目没有沙箱、命令白名单、额外审批层或多用户隔离。请保留回环地址监听，只连接可信客户端。返回的文件内容、日志和图片会进入调用方客户端；本地执行不代表数据只在本地处理。连接电脑前请阅读 [SECURITY.md](../SECURITY.md)。
 
+**预编译 v1.0.0：**[下载对应平台运行包](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.0.0) · [安装与升级指南](BINARY_INSTALL.zh-CN.md)。内置 Node、原生依赖和固定版本 Tunnel，无需安装编译工具。本版暂不进行发布者签名和 Apple 公证。
+
 ## 目录
 
 [选择接入方式](#connection) · [环境要求](#requirements) · [安装](#install) · [全局命令 / mdr](#global-command) · [本地 HTTP / stdio](#local) · [ChatGPT 部署](#chatgpt) · [工具能力](#tools) · [执行历史](#history) · [配置说明](#configuration) · [日常维护](#operations) · [日志目录与查看](#logs) · [常见问题](#troubleshooting) · [测试验证](#validation) · [文档索引](#documentation)
@@ -53,6 +55,8 @@ flowchart TB
 <a id="requirements"></a>
 ## 环境要求
 
+推荐的**预编译发行版**只需匹配支持的平台和架构，不要求系统另装 Node/npm/Go/编译器，见[预编译安装](BINARY_INSTALL.zh-CN.md)。下表是**源码开发**的前置条件，不是运行包的安装要求。
+
 | 依赖 | 何时需要 |
 | --- | --- |
 | [Node.js 24 或更高版本](https://nodejs.org/en/download)，包含 npm | 安装依赖、编译 TypeScript、运行服务 |
@@ -72,17 +76,14 @@ rg --version
 
 macOS 上需要本地编译依赖时，可用 `xcode-select --install` 安装 Xcode Command Line Tools。Debian/Ubuntu 常见的本地编译依赖为 `build-essential`、`python3`、`pkg-config`；Node.js 请单独安装并确认版本满足要求。参考 [node-pty 编译依赖](https://github.com/microsoft/node-pty#dependencies)。不要用 `sudo` 运行本项目。
 
-| 平台 | 验证情况 |
-| --- | --- |
-| macOS Apple Silicon | 已有本机验证，详见注明日期的[验证记录](VALIDATION.md) |
-| macOS Intel | 面向 POSIX 的支持目标，记录中尚无硬件实测 |
-| Linux | 已实现 POSIX 路径并配置 Ubuntu CI；本地验证记录不代表 Linux 已执行验证 |
-| 原生 Windows | 当前不支持 |
-
-有 CI 配置不等于 CI 已成功运行。容器或虚拟机中的服务操作的是容器或虚拟机环境，不会自动获得宿主机全部文件和桌面访问能力。
+预编译包在 macOS 14 ARM64、macOS 15 Intel 和 Ubuntu 22.04 x64/ARM64 上分别进行原生验证；实际产物检查记录随 Release 的 `VERIFICATION.json` 提供，模拟 Tunnel 生命周期测试不代表真实云端连接。历史源码回归记录见 [VALIDATION.md](VALIDATION.md)。
 
 <a id="install"></a>
-## 一、从源码安装
+## 一、安装
+
+**推荐：**下载[预编译发行版](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.0.0)，核对 SHA-256、解压并运行其中的 `./install.sh`。[预编译指南](BINARY_INSTALL.zh-CN.md)说明用户目录、命令、共存、升级和回退；这个安装器不编译或下载依赖。
+
+### 源码开发替代方式
 
 使用下面的地址克隆仓库；私有仓库需要使用具有访问权限的账号。使用 Fork 时，改为该 Fork 的克隆地址。如果使用下载后解压的源码包，跳过克隆，进入解压后的项目目录即可。
 
@@ -110,6 +111,8 @@ cd mcp-dev-runtime
 
 <a id="global-command"></a>
 ### 在任意目录使用全局命令
+
+两种安装方式提供同样的 CLI。预编译版使用内置 Node 和用户级配置；下面的 `npm run command:*` 说明专用于源码 checkout。预编译版移除入口使用 `./install.sh --unregister`，并保留原来的 prefix/bin 参数，见[预编译安装](BINARY_INSTALL.zh-CN.md)。
 
 安装成功后，会在 `~/.local/bin/mcp-dev-runtime` 注册**当前用户的全局命令**。安装器还会自动尝试注册短命令 `mdr`；如果这个名字已被其他程序占用，只跳过短命令，不影响整个安装成功。两个入口都仍使用同一份源码、Node 程序、Tunnel 缓存和配置，不会复制第二套运行时，也不需要 `sudo`。注册后不要删除源码目录或对应 Node 安装。
 
@@ -141,7 +144,7 @@ mdr paths
 
 普通 `status` 是日常查看用的简洁摘要；`--verbose` 会补充进程 PID、实例 ID、延迟、内存、保留会话 / 历史大小以及 Tunnel 版本；`--json` 保留完整的机器可读 supervisor 对象，适合脚本和深度排障。长命令 `mcp-dev-runtime` 支持同样参数；通过 npm 使用时写成 `npm run status -- --json` 或 `npm run status -- --verbose`。
 
-`mdr paths` 只显示当前这份安装真正解析并使用的路径，不预览假设中的未来目录，也不会迁移任何文件。以后 npm / 全局发行版如果改用用户目录，同一个命令会自然显示当时实际生效的路径。需要机器可读结果时用 `mdr paths --json`。
+`mdr paths` 只显示当前这份安装真正解析并使用的路径，不预览假设中的未来目录，也不会迁移任何文件。源码版与预编译版均通过同一个命令显示实际生效的路径。需要机器可读结果时用 `mdr paths --json`。
 
 为了每次启动不用重新填写凭据文件路径，把 `"env_file": "runtime.env"` 合并到**已有的** `launcher.config.json` 中，保留其他设置；这个值是文件名，不是 API Key。之后在任意目录都可以运行 `mcp-dev-runtime up --background` 和 `mcp-dev-runtime down`。显式传入 `--env-file FILE` 时，相对路径按终端当前目录解析，必要时使用绝对路径。注册命令本身不读取或修改 `runtime.env`，也不启动或停止服务。
 
@@ -443,6 +446,8 @@ npm run up -- --env-file runtime.env --background
 
 `down` 只操作选中的受管实例。使用自定义状态目录时，`up`、`status`、`down` 都应传入相同的 `--state-dir`，或统一使用同一份启动器配置。它不会接管无关监听服务，也不会仅凭旧 PID 文件就结束某个系统进程。
 
+**预编译版升级**使用[版本目录安装与回退流程](BINARY_INSTALL.zh-CN.md#升级回退与源码版共存)，不要在运行包里执行 `npm ci`。
+
 升级源码时，先审阅并保存自己的修改、停止活动任务，在私有位置备份本地配置和需要保留的历史，再切换到经过审阅的发布版本或提交。**不要用示例配置覆盖现有配置。** 然后执行：
 
 ```bash
@@ -470,7 +475,7 @@ node dist/launcher/cli.js history-clear --config config.json --confirm
 <a id="logs"></a>
 ## 日志目录、查看方法与错误排查
 
-通过启动器 `up` 管理的服务，诊断日志保存在启动器的**状态目录**中，默认是安装目录下的 `.runtime/`。不是 `~/.local/bin`，也不会因为你在另一个项目目录执行全局命令就换位置。
+通过启动器 `up` 管理的服务，用 `mdr paths` 查看真实的 **Logs** 目录。预编译版在 macOS 使用 `~/Library/Logs/mcp-dev-runtime`，Linux 使用用户 XDG 状态目录；源码版默认仍是源码旁的 `.runtime/`。`logs_dir` 可将日志与 supervisor 状态分离；旧源码或自定义配置未指定时仍沿用 `state_dir`。下表是源码默认路径，预编译版应使用实际显示的 Logs 路径。
 
 | 默认路径，相对于安装目录 | 内容 |
 | --- | --- |
@@ -507,7 +512,7 @@ grep -nEi -C 3 'error|failed|failure|exception|panic|timeout|timed out|ECONN|EAD
 
 **改过目录时：**所选 `launcher.config.json` 的 `state_dir` 决定这些日志的路径。JSON 中的相对路径以该配置文件为基准，命令行 `--state-dir` 的相对路径以调用目录为基准。`up`、`status`、`down` 要使用相同的配置或覆盖项。普通 `mcp-dev-runtime status` / `mdr status` 会显示解析后的日志目录；`status --json` 会在 `logs[].file` 中给出 MCP / Tunnel 日志的绝对路径。自定义安装应以这些实际路径为准，不能继续假定是 `.runtime/`。
 
-当前源码 checkout 有意把 `.runtime/` 放在项目目录中。未来通过 npm / 全局安装时，不应把可变状态写入安装包或 `node_modules`；到那时 `mdr paths` 仍只显示实际生效的目录，不需要改变命令语义。
+当前源码 checkout 有意把 `.runtime/` 放在项目目录中。预编译版已经把可变数据放在程序目录外，`mdr paths` 在两种模式下都只显示实际生效的目录。
 
 **服务日志不等于命令输出历史。**构建、测试或 Shell 命令失败时，应查看工具返回的 `output` 和真实 `exit_code`，必要时用 `write_stdin` 继续读取该会话。磁盘执行历史默认在运行时配置的 `cwd` 下的 `.mcp-dev-runtime/history/`；运行时配置中的 `history.directory` 可以将其改到其他位置，例如 `.runtime/history/`。默认不保存工具的原始 stdout/stderr，需要保留某次构建日志时，在启动任务时设置 `capture_output: true`，再通过[历史工具](#history)查询有容量上限的档案，而不是到 `mcp.log` 中找每一条构建输出。
 

@@ -65,41 +65,29 @@ API Key 页面不会生成 Tunnel ID。组织 ID、工作区 ID、隧道名称�
 **本步完成标志：**你的账号已启用开发者模式，并能找到自定义应用的创建入口。
 
 <a id="step-2"></a>
-## 第 2 步：在自己的电脑安装项目
+## 第 2 步：安装预编译运行包
 
-macOS 可以通过 Spotlight 搜索“终端 / Terminal”；Linux 打开终端应用。下面命令在**本机终端**执行，不是粘贴到 ChatGPT 输入框。代码块没有包含提示符 `$`，逐行执行即可。
+在需要让 ChatGPT 访问的那台电脑打开终端，按[预编译安装指南](BINARY_INSTALL.zh-CN.md)选择 v1.0.0 对应平台压缩包，对照 `SHA256SUMS` 校验后解压，执行包内 `./install.sh`。运行包内置 Node、原生依赖和固定 Tunnel，不必安装 Node/npm/Go/编译器。本版明确跳过发布者签名与 Apple 公证，请在运行下载软件前核对系统要求的许可。
 
-先检查已安装的工具；Node.js 需要 **24 或更高版本**：
-
-```bash
-node --version
-npm --version
-git --version
-```
-
-没有 Node.js 时先按 [Node.js 官方下载说明](https://nodejs.org/en/download)安装，重新打开终端再检查。macOS 缺少 Git 或本地编译工具时，按系统提示安装 Command Line Tools；更多依赖见 [README 环境要求](README.zh-CN.md#requirements)。不要用 `sudo` 运行本项目。
-
-选择一个用于存放源码的目录，再执行：
+以 Apple Silicon 为例，下载并完成校验后：
 
 ```bash
-git clone https://github.com/dolibali/mcp-dev-runtime.git
-cd mcp-dev-runtime
+tar -xzf mcp-dev-runtime-1.0.0-darwin-arm64.tar.gz
+cd mcp-dev-runtime-1.0.0-darwin-arm64
 ./install.sh
 ```
 
-私有仓库需要 GitHub 访问权限；出现 `Repository not found` 时先确认仓库访问和 Git 登录，不要把它当成 Tunnel 错误。使用已经下载的源码包时，跳过 `git clone`，直接进入解压目录。
+Linux 或 Intel Mac 使用对应文件名。安装器复制版本化程序目录，只创建缺失的用户配置，并注册 `mcp-dev-runtime`；`mdr` 无冲突时同时注册。不会启动服务或下载依赖。短命令被跳过时，下文所有 `mdr` 都替换为 `mcp-dev-runtime`。需要补充 PATH 时按提示操作：
 
-安装器会按照锁文件安装精确 npm 依赖、编译 MCP Dev Runtime、只在缺失时创建三个本地配置文件，并验证或构建 `tunnel.lock.json` 精确固定的 Tunnel。这个阶段**不需要**你的 Tunnel ID 或 API Key，也不会擅自运行 sudo、Homebrew 或 apt。需要构建 Tunnel 而缺少 Git、Go 或 `make` 时，按提示使用官方或系统方式安装对应前置条件，再重新运行 `./install.sh`。
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+mdr paths
+mdr doctor --offline
+```
 
-第一次可以保留 `config.json` 中的 `cwd: "."`，从仓库根目录启动。需要改默认项目目录时，使用已存在的绝对路径；`cwd` 不是文件访问白名单。后续终端命令也在这个仓库目录执行。重复运行安装器不会覆盖已有 `config.json`、`launcher.config.json` 和 `runtime.env`。
+`mdr paths` 显示实际配置、日志路径，不展示尚未使用的目录。新配置的默认工作目录是用户主目录；需要时把 `cwd` 改为已有的绝对工作路径。它是默认目录，不是文件访问白名单。保留回环监听，不要用 sudo 运行 MDR。
 
-保留 `127.0.0.1` 回环监听，不要将这个无额外隔离的运行时暴露到公网。配置文件使用纯文本 JSON，双引号、不写注释、不加末尾逗号。已经有工作副本时直接进入它，不要重复克隆覆盖，也不要在任务运行时重装依赖。原生 Windows 暂不支持；使用其他平台前先看环境要求。
-
-**本步完成标志：**脚本最后显示 `MCP Dev Runtime setup complete`，离线诊断通过。这里只证明本地安装完成，还没有证明 ChatGPT 已经能连到电脑。
-
-安装器还会注册 `~/.local/bin/mcp-dev-runtime`；如果 `mdr` 名称没有冲突，也会自动注册这个短入口。发现已有无关 `mdr` 时不会覆盖，只跳过短命令并继续完成安装。如果它提示补充 PATH，先按提示操作，再使用全局命令；下面原有的 `npm run ...` 命令仍可在仓库目录使用。注册不会修改 Shell 启动文件，也不会自动启动服务。详见[全局命令使用说明](README.zh-CN.md#global-command)。
-
-安装成功并提示已注册时，日常可以直接使用 [`mdr` 短命令](README.zh-CN.md#short-command)；已有同名工具不会被覆盖。服务日志保存位置和查看命令见 [README 日志说明](README.zh-CN.md#logs)。
+**本步完成标志：**安装完成且离线 doctor 通过；还没有建立真实 Tunnel 连接。现有源码 checkout 可继续按[源码流程](README.zh-CN.md#install)使用，不要在预编译包里执行 npm setup 或覆盖源码版拥有的命令。日志说明见 [README](README.zh-CN.md#logs)。
 
 <a id="step-3"></a>
 ## 第 3 步：创建 Tunnel，找到真正的 Tunnel ID
@@ -156,75 +144,49 @@ Organization ID 可在 [Platform 组织 General](https://platform.openai.com/set
 **本步完成标志：**手里有运行时 API Key，而不是 Admin Key、ChatGPT 密码、密钥名称或带省略号的预览值。
 
 <a id="step-5"></a>
-## 第 5 步：把两项值填进本机配置
+## 第 5 步：填写本机凭据文件
 
-回到项目目录的终端，创建文件但不覆盖已经存在的配置：
+安装器已经创建私人 `runtime.env`，并配置启动器读取它。用 `mdr paths` 找到启动器配置，再用纯文本编辑器打开旁边的 `runtime.env`。默认位置是 macOS `~/Library/Application Support/mcp-dev-runtime/runtime.env`、Linux `~/.config/mcp-dev-runtime/runtime.env`；绝对路径 XDG 覆盖项会生效。
+
+macOS 默认路径可执行：
 
 ```bash
-umask 077
-test -f launcher.config.json || cp launcher.config.example.json launcher.config.json
-test -f runtime.env || cp .env.example runtime.env
-chmod 600 runtime.env
-nano runtime.env
+nano "$HOME/Library/Application Support/mcp-dev-runtime/runtime.env"
 ```
 
-将下面两个等号右边的占位内容替换为自己的值，一行一个：
+把下面两个值改为自己的真实凭据，一行一个：
 
 ```dotenv
 CONTROL_PLANE_TUNNEL_ID=tunnel_00000000000000000000000000000000
 CONTROL_PLANE_API_KEY=replace-with-your-own-runtime-key
 ```
 
-全零 ID 和 `replace-with-your-own-runtime-key` **都不是可用凭据**。只复制真实值，不要加中文引号、换行或 Markdown 反引号。`runtime.env` 必须是纯文本文件，不是 `runtime.env.txt`。
+这些示例**不是可用凭据**。不要加入中文引号、Markdown 反引号或换行。在 nano 用 **Control+O → Enter** 保存，再 **Control+X** 退出；不是 Command。不要截图、打印或将密钥发到聊天/Git，文件应保持私人权限 `0600`。密钥泄露应撤销并换新，不是仅从最新文本删除。参考[官方密钥安全说明](https://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety)。
 
-使用 nano 时：**Control+O → Enter** 保存，再 **Control+X** 退出；macOS 上也是 Control，不是 Command。不要截图这个文件。文件已在 `.gitignore` 中排除；不要用 `git add -f` 强行提交。
+生成的启动器已经设置 `env_file: "runtime.env"`，相对于该配置文件解析。已导出的非空环境变量仍优先。源码安装继续使用自己项目里的 env 文件及现有启动器设置，不会自动迁移凭据。
 
-没有 nano 时也可以使用纯文本编辑器。不要通过 `cat runtime.env`、输出全部环境变量或打印密钥值来排障。密钥一旦被发进聊天或提交到 Git，应撤销并换新，不能只把最新版本中的文字隐藏。参考 [OpenAI 密钥安全说明](https://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety)。
-
-这里使用 `--env-file runtime.env` 显式加载；启动器不会无条件自动读取一个同名文件。已经导出的非空环境变量优先于文件，修改文件却仍使用旧账号时要检查终端环境，但不要打印密钥来排查。
-
-**本步完成标志：**两个真实值已保存在本地文件中，未发到聊天或仓库。
+**本步完成标志：**两个真实值已保存在本机，未发到聊天或仓库。
 
 <a id="step-6"></a>
-## 第 6 步：确认 Tunnel 客户端并启动两个本地服务
+## 第 6 步：验证并启动本地服务
 
-### 6.1 确认一键安装准备的 Tunnel
-
-第 2 步默认运行的 `./install.sh` 已经准备 Tunnel 客户端。先确认当前能解析到经过校验的程序：
+预编译包已内置固定版本 Tunnel。`tunnel-setup` 核对包内版本与哈希，不会创建 Platform 隧道、签发密钥、下载最新代码，也不需要 Go；源码构建是单独的流程。
 
 ```bash
-npm run tunnel:setup
+mdr tunnel-setup
+mdr up --background
+mdr status
+mdr doctor
+mdr smoke
 ```
 
-如果之前明确用了 `./install.sh --local-only`，或者因缺少构建前置条件而中断，安装好对应条件后重新执行普通安装：
+不要在相同端口另外启动 `mdr serve` 或 `npm start`；`up` 已负责 MCP 和 Tunnel。`doctor` 核对本地 MCP、工具发现和选中 Tunnel 的就绪状态，`smoke` 应显示 `LOCAL MCP SMOKE PASSED`。`status` 是简洁摘要，`status --verbose` 补充细节，`status --json` 显示完整状态；运行时间精确到秒。
 
-```bash
-./install.sh
-```
+默认仍是 MCP `127.0.0.1:3001` 和独立的 Tunnel 健康端口 `127.0.0.1:9098`。冲突时先检查任务并停止选中的实例，再修改 `mdr paths` 显示的实际配置；保留回环地址，使用互不相同的空闲端口。全局 `mdr smoke` 会跟随当前配置，本地端口变化不影响 Tunnel ID。详见[端口说明](DEPLOYMENT.md#ports)。
 
-安装器会先尝试复用已经兼容的二进制；找不到时按 [tunnel.lock.json](../tunnel.lock.json) 拉取上游**精确 commit**，构建精简的 `tunnel-client-runtime`，校验报告的版本和提交，并将程序和 SHA-256 构建记录放到被忽略的 `.runtime/bin/<commit>/`。只有明确要重复构建这个固定版本时才使用 `./install.sh --force-tunnel-build`。`tunnel:setup` 和安装器都只处理本机程序，**不会替你创建 Platform Tunnel 或 API Key**。
+原始 curl 探测只作可选排障，不是额外必做步骤。发行版日志在程序目录外，查看 `mdr paths` 显示的实际 Logs 路径及[日志指南](README.zh-CN.md#logs)。`mdr down` 会停止选中的实例及其任务，不是只读检查；后台运行也不是系统开机自启，不能让睡眠电脑持续在线。
 
-### 6.2 启动并检查
-
-**不要同时运行独立的 `npm start`。** 本教程的 `up` 已负责启动 MCP 和 Tunnel。已有手动进程占用相同端口时，在对应终端停止自己启动的旧实例，不能随意杀掉未知进程。
-
-```bash
-npm run up -- --env-file runtime.env --background
-npm run doctor
-npm run smoke
-```
-
-检查 `doctor` 是否显示 `PASS`，其中 `runtime.ok`、`protocol.ok` 为 true，对应受管实例的 `health.availability` 为 `ready`；各项工具链结果和历史告警也要看。`smoke` 应显示 `LOCAL MCP SMOKE PASSED`。按上文创建标准配置文件后，`doctor` 会读取选中的配置，日常诊断不用手动输入端口。`npm run status` 默认给出简洁摘要；需要更多细节时加 `-- --verbose`，需要完整机器可读状态时加 `-- --json`。
-
-**默认端口：**本地 MCP 使用 `127.0.0.1:3001`，Tunnel 的独立健康监听使用 `127.0.0.1:9098`。没有冲突就保持默认；冲突时修改 `config.json` 中对应的 `port`，或 `launcher.config.json` 中的 `tunnel_health_port`，保留回环监听，确认没有需要保留的活动任务后再重启。两个端口要未被占用且互不相同，改过 MCP 地址后也要向 `smoke` 传入新 URL。Tunnel ID 不会因此改变。详见[端口调整步骤](DEPLOYMENT.md#ports)。
-
-`doctor` 检查成功后，不必再执行两条 `curl` 命令。原始 `/healthz` 与 `/readyz` 请求放在[分层探测说明](DEPLOYMENT.md#direct-probes)，作为**可选排障手段**，用于组合诊断失败时分别确认是哪一层出了问题。
-
-保持电脑开机联网和服务运行，再去下一步。后台启动不等于系统开机自启，也不能让睡眠中的电脑持续在线。上述只是本地检查，尚未证明 ChatGPT 到本机的完整调用成功。
-
-**本步完成标志：**MCP、Tunnel 都就绪，诊断通过。
-
-安装时成功注册短命令后，日常可在**任意终端目录**运行 `mdr status`、`mdr doctor` 和 `mdr smoke`（长命令 `mcp-dev-runtime` 完全等价）。需要更多运行细节时用 `mdr status --verbose`，只有需要完整对象时才用 `mdr status --json`。只用 `mdr up --background` 启动前，先把 `"env_file": "runtime.env"` 合并进已有启动器配置，不要覆盖整个文件。`mdr down` 会停止对应受管实例及其任务，不是只读检查命令。
+**本步完成标志：**本地服务和诊断就绪。保持电脑开机联网；下一步仍需通过 ChatGPT 实际调用来验证完整链路。
 
 <a id="step-7"></a>
 ## 第 7 步：在 ChatGPT 创建应用，Connection 选 Tunnel

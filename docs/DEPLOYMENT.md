@@ -1,5 +1,12 @@
 # Deployment and lifecycle
 
+## Precompiled v1 distribution
+
+For end-user installation use [BINARY_INSTALL.md](BINARY_INSTALL.md) / [中文预编译安装](BINARY_INSTALL.zh-CN.md). The release marker selects user-scoped config/state/log directories; source checkouts still resolve their existing project-local configuration. Binary packages include Node and Tunnel, so the source-oriented npm/build instructions below are not run inside the installed binary package. The optional `logs_dir` separates log files from `state_dir`; omitted source/custom values retain the old default. Long socket paths use a private per-user hashed IPC directory without moving state or history.
+
+Binary `init` only creates missing private config files and never copies credentials or starts a service. `paths` and `status` report effective locations. Publisher signing/notarization are deliberately skipped for v1.0.0.
+
+
 First-time installation: [English README](../README.md#install) | [中文部署指南](README.zh-CN.md#install). This page is the operational reference for project 0.3.0 / contract 3.1.
 
 For the complete browser-to-terminal walkthrough, including developer mode and where to create keys and copy Tunnel IDs, see [ChatGPT setup](CHATGPT_SETUP.md) / [ChatGPT 新手图文教程](CHATGPT_SETUP.zh-CN.md).

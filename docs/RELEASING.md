@@ -1,4 +1,21 @@
-# Source release procedure
+# Release procedure
+
+## Precompiled stable releases
+
+The primary v1 artifacts are four self-contained platform archives, `SHA256SUMS`, and `VERIFICATION.json`. Do not upload the maintainer's working directory, credentials, `node_modules`, or cached Tunnel binary as a release. The builder obtains pinned official Node archives, installs locked production dependencies under the matching Node, and builds the pinned Tunnel in a clean temporary checkout.
+
+1. Review changes, run source regressions and binary-package validation, and bump the project version with `npm version VERSION --no-git-tag-version`. Keep `.node-version` and `release-toolchain.lock.json` consistent; do not change Tunnel pins unless deliberately reviewed.
+2. Update the bilingual installation docs and `docs/releases/vVERSION.md`. Commit normally and push the reviewed source. The release builder refuses a dirty checkout; `--allow-dirty` is only for local package testing and cannot pass the release aggregator.
+3. Run the **Precompiled release** workflow on that exact commit with `create_draft=true`. It builds and verifies on macOS ARM64/x64 and Ubuntu glibc ARM64/x64 runners, generates GitHub build provenance, and aggregates only matching, successful artifacts from that commit. Build jobs do not receive user Tunnel credentials or publishing secrets.
+4. Inspect the draft's four archives, checksums, verification report, tag target and release notes. Only then publish the draft. Do not overwrite a published release/tag to fix a defect; issue a new patch version.
+
+The `MDR_SIGNING_MODE=skip` setting intentionally omits publisher signing and Apple notarization for v1.0.0. `scripts/release/sign.mjs` is the reserved boundary before the manifest/archive hashes are generated; any other mode currently fails closed. A future signer must be reviewed and supplied through protected release credentials. GitHub build provenance is separate from OS signing.
+
+Binary acceptance extracts the exact archive into paths containing spaces/Unicode, installs with system Node/npm/Go/compiler/download commands unavailable, exercises all six tools, validates stdio and managed lifecycle (with an explicitly mocked Tunnel), protects active upgrades, checks idempotence/foreign-command conflicts, and tests version switching using a synthetic prior package. It separately verifies the actual bundled Tunnel executable against its recorded hash. It does not claim a real ChatGPT/cloud connection on every runner.
+
+Source export below remains a maintainer audit/development option, not a primary v1 release attachment. npm publication is still intentionally disabled.
+
+## Source export reference
 
 Installation and deployment: [English](../README.md) | [简体中文](README.zh-CN.md). Keep the two README versions aligned when commands, defaults or compatibility boundaries change.
 

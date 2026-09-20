@@ -12,6 +12,8 @@ This is an independent community project, not an OpenAI product. The runtime exe
 
 > **Trust boundary:** commands run with the service user's OS permissions. There is no sandbox, command allowlist, additional approval layer or multi-user isolation. Keep the listener on loopback and connect only trusted clients. Returned files, logs and images reach the calling client; local execution does not mean local-only data handling. Read [SECURITY.md](SECURITY.md) before connecting a machine.
 
+**Precompiled v1.0.0:** [Download the matching runtime package](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.0.0) · [Installation and upgrade guide](docs/BINARY_INSTALL.md). Includes Node, native dependencies and the pinned Tunnel; no build toolchain is needed. Publisher signing / Apple notarization are skipped for this release.
+
 ## Contents
 
 [Choose a connection](#connection) · [Requirements](#requirements) · [Install](#install) · [Global command / mdr](#global-command) · [Local HTTP / stdio](#local) · [ChatGPT deployment](#chatgpt) · [Tools](#tools) · [History](#history) · [Configuration](#configuration) · [Operations](#operations) · [Logs](#logs) · [Troubleshooting](#troubleshooting) · [Validation](#validation) · [Documentation](#documentation)
@@ -53,6 +55,8 @@ Arrows show **request/response data flow**, not who opens an inbound network con
 <a id="requirements"></a>
 ## Requirements
 
+For the recommended **precompiled distribution**, use a matching supported macOS/Linux package; no external Node/npm/Go/compiler is required. See [binary installation](docs/BINARY_INSTALL.md). The table below applies to **source development**, not the release installer.
+
 | Requirement | When needed |
 | --- | --- |
 | [Node.js 24 or newer](https://nodejs.org/en/download), with npm | Installation, TypeScript build and runtime |
@@ -72,17 +76,14 @@ rg --version
 
 On macOS, install Xcode Command Line Tools with `xcode-select --install` if native builds require them. On Debian/Ubuntu, the usual native build dependencies are `build-essential`, `python3` and `pkg-config`; install Node.js separately and confirm it meets the requirement. See [node-pty's build prerequisites](https://github.com/microsoft/node-pty#dependencies). Do not run this project with `sudo`.
 
-| Platform | Validation status |
-| --- | --- |
-| macOS Apple Silicon | Locally tested; see the dated [validation record](docs/VALIDATION.md) |
-| macOS Intel | Intended POSIX target; not hardware-verified in that record |
-| Linux | POSIX implementation and Ubuntu CI configured; no Linux execution claimed by the local validation record |
-| Native Windows | Not supported |
-
-The presence of a CI workflow is not evidence that it has run successfully. Containers and VMs expose their own environment, not automatically the host's filesystem or desktop.
+Precompiled package verification runs natively on macOS 14 ARM64, macOS 15 Intel, and Ubuntu 22.04 x64/ARM64. Exact package checks are published in `VERIFICATION.json`; mock Tunnel lifecycle tests do not claim real cloud connectivity. Source regression checkpoints remain in [VALIDATION.md](docs/VALIDATION.md).
 
 <a id="install"></a>
-## 1. Install from source
+## 1. Install
+
+**Recommended:** download a [precompiled release](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.0.0), verify its SHA-256, extract it and run its `./install.sh`. The [binary guide](docs/BINARY_INSTALL.md) covers user directories, commands, coexistence, upgrade and rollback. This installer does not compile or download dependencies.
+
+### Source development alternative
 
 Clone the repository below; a private repository requires an account with access. For a fork, use its clone URL instead. For an extracted source archive, skip cloning and enter the extracted project directory.
 
@@ -110,6 +111,8 @@ Development dependencies are needed for the build. The install path also prepare
 
 <a id="global-command"></a>
 ### Use the command from any directory
+
+Both installation modes provide the same CLI. Binary packages use their own bundled Node and user-scoped configuration; the source-specific `npm run command:*` instructions below apply to checkouts. Binary command removal uses `./install.sh --unregister` with the original prefix/bin options. See [binary installation](docs/BINARY_INSTALL.md).
 
 After successful setup, a **user-level global command** is registered at `~/.local/bin/mcp-dev-runtime`. Setup also tries to register the short `mdr` command automatically when that name is free. If `mdr` conflicts with another program, only the short alias is skipped and the installation still succeeds. Both entries use the same checkout, Node executable, Tunnel cache and configuration; they do not copy a second runtime or require `sudo`. Keep the checkout and its Node installation in place.
 
@@ -141,7 +144,7 @@ mdr paths
 
 Plain `status` is a short human-readable summary for daily checks. `--verbose` adds process IDs, instance IDs, latency, memory, retained-session/history sizes and Tunnel version. `--json` preserves the complete machine-readable supervisor object for scripts and deep troubleshooting. The long `mcp-dev-runtime` command supports the same flags; from npm use `npm run status -- --json` or `npm run status -- --verbose`.
 
-`mdr paths` shows only the paths actually resolved for the current installation. It does not preview hypothetical future locations or migrate anything. If a later npm/global distribution uses different user directories, the same command will report those effective paths. Use `mdr paths --json` for machine-readable output.
+`mdr paths` shows only the paths actually resolved for the current installation. It does not preview hypothetical future locations or migrate anything. Source and precompiled distributions use the same command to report their effective paths. Use `mdr paths --json` for machine-readable output.
 
 For startup without typing the credentials path each time, merge `"env_file": "runtime.env"` into the **existing** `launcher.config.json` (do not replace the other settings). The value is a filename, not the API key. You can then use `mcp-dev-runtime up --background` and `mcp-dev-runtime down` from any directory. With explicit `--env-file FILE`, a relative FILE is resolved from the terminal's current directory; use an absolute path when appropriate. Registration itself never reads or changes `runtime.env` and never starts or stops a service.
 
@@ -435,6 +438,8 @@ npm run up -- --env-file runtime.env --background
 
 `down` affects only the selected managed instance. With a custom state directory, pass the same `--state-dir` to `up`, `status` and `down`, or keep it in the same launcher configuration. It will not adopt an unrelated listener or kill a process merely because an old PID file names it.
 
+For a **binary upgrade**, follow [the versioned installer and rollback procedure](docs/BINARY_INSTALL.md#upgrade-rollback-and-source-coexistence). Do not run `npm ci` inside a binary installation.
+
 For a source upgrade: review/save local changes, stop active work, back up local configuration and required history privately, and check out the reviewed release or commit. Do not overwrite an existing configuration with the example file. Then run:
 
 ```bash
@@ -462,7 +467,7 @@ Temporary readiness failures update health instead of rerunning commands; an act
 <a id="logs"></a>
 ## Logs: location, viewing and error investigation
 
-For a launcher-managed installation (`up`), diagnostic logs live in the launcher's **state directory**, which defaults to `.runtime/` inside the installation directory. This is **not** `~/.local/bin` and does not change when you run the global command from another project.
+For a launcher-managed installation (`up`), `mdr paths` reports the actual **Logs** directory. Binary packages use `~/Library/Logs/mcp-dev-runtime` on macOS or the user XDG state directory on Linux. Source checkouts retain `.runtime/` beside the source by default. A configured `logs_dir` separates logs from supervisor state; when omitted in an existing source/custom configuration, it falls back to `state_dir`. The table below shows source defaults; use the actual Logs path for a binary installation.
 
 | Default path, relative to the installation | Contents |
 | --- | --- |
@@ -499,7 +504,7 @@ Keyword matching is not an error classifier: no match is not proof of health, an
 
 **Custom directory:** `state_dir` in the selected `launcher.config.json` controls these paths. Relative JSON paths resolve from that configuration file, while a CLI `--state-dir` resolves from the caller. Use the same configuration/override for `up`, `status` and `down`. Plain `mcp-dev-runtime status` / `mdr status` shows the resolved log directory; `status --json` includes the absolute MCP/Tunnel filenames in `logs[].file`. Read those paths instead of assuming a custom installation still uses `.runtime/`.
 
-For the current source-checkout installation, `.runtime/` is intentionally colocated with the project. A future npm/global distribution should keep mutable data outside the installed package tree, but `mdr paths` will continue to show only whichever locations are actually in use at that time.
+For the current source-checkout installation, `.runtime/` is intentionally colocated with the project. Precompiled distributions already keep mutable data outside the installed package tree; `mdr paths` reports the effective layout in both modes.
 
 **Service logs are not command-output history.** When a build, test or shell command fails, inspect its returned `output` and actual `exit_code`, and continue that session with `write_stdin` if necessary. Disk execution history separately defaults to `.mcp-dev-runtime/history/` under the runtime's configured `cwd`; `history.directory` in the runtime configuration can move it elsewhere, for example `.runtime/history/`. Raw tool stdout/stderr is not saved there by default: enable `capture_output: true` when starting a task to preserve its bounded archive. Query it through the [history tools](#history), not by expecting every build's output in `mcp.log`.
 

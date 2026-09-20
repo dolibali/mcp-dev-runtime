@@ -17,7 +17,7 @@ const report={checked_at:new Date().toISOString(),node:process.version,platform:
   cwd:config.cwd,shell:config.shell,configuration_file:file??null,toolchains:{},
   scope:'Local configuration, fresh liveness, MCP discovery and managed Tunnel readiness; not a remote ChatGPT round trip.'};
 for(const name of ['rg','git','node']){
-  const result=spawnSync(name,['--version'],{encoding:'utf8',timeout:3000});
+  const result=spawnSync(name==='node'?process.execPath:name,['--version'],{encoding:'utf8',timeout:3000});
   report.toolchains[name]={available:!result.error&&result.status===0,version:result.error?result.error.message:(result.stdout||result.stderr).trim().split('\n')[0]};
 }
 const root=path.resolve(path.dirname(require.resolve('node-pty')),'..');

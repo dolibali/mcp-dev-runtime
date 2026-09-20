@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased
+## 1.0.0 — 2026-09-20
+
+- Ship self-contained native macOS ARM64/x64 and Linux glibc ARM64/x64 archives, with pinned Node 24.21.0, production native dependencies and the unchanged pinned Tunnel.
+- Add an offline user-level binary installer with versioned upgrades/rollback, integrity verification, command-conflict protection and private user configuration. Source checkouts retain their existing paths.
+- Separate diagnostic logs from supervisor state with optional `logs_dir`, and use a private short IPC path when required.
+- Reserve a fail-closed signing boundary; v1.0.0 deliberately skips publisher signing and Apple notarization.
+- Add native package verification, checksums, SBOM, component license records and GitHub build provenance.
+
 
 - Add `paths [--json]` to show only the package/config/state/log paths actually resolved for the current installation, keeping the command compatible with future distribution layouts.
 - Make `status` concise and human-readable by default, add `status --verbose` for operational detail, and preserve the previous complete object behind `status --json`.

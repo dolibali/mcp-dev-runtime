@@ -1,4 +1,10 @@
-# 0.3.0 local validation record
+# Validation record
+
+## v1.0.0 precompiled distribution
+
+The release workflow is the source of truth for the final per-platform result. Every published archive must pass `scripts/release/verify.mjs` on its native runner and match the same clean source commit. The release-level `VERIFICATION.json` and per-archive `BUILD-MANIFEST.json` record results, versions, platform and skipped publisher signing. The first local macOS ARM64 candidate passed the 12 package acceptance groups, including the 20 real-tool checks, under an isolated HOME and guarded PATH without system build tools.
+
+Source regressions passed 195 tests (104 unit, 32 protocol, 59 launcher) during release preparation. New coverage includes binary/source layout separation, XDG path validation, private initialization, caller-relative state/log overrides, bundle integrity and explicit signing-skip behavior. Historical checkpoints below refer to earlier development versions, not newly repeated performance or cloud tests.
 
 ## Resolved path reporting — 2026-09-20
 

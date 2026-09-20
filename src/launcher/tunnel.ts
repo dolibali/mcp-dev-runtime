@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { VERSION } from '../version.js';
 import { ROOT } from './options.js';
+import { distribution, layout } from './layout.js';
 const exec = promisify(execFile);
 export type TunnelLock = {
   schema_version: number; runtime_version: string; contract_version: string;
@@ -44,6 +45,12 @@ export type TunnelBinary = Awaited<ReturnType<typeof inspectTunnel>>;
 export async function resolveTunnel(explicit?: string): Promise<TunnelBinary> {
   const lock = await readLock();
   if (explicit || process.env.TUNNEL_BIN) return inspectTunnel(path.resolve(explicit ?? process.env.TUNNEL_BIN!), lock);
+  const d = distribution();
+  if (d) {
+    const binary = await inspectTunnel(path.join(layout().bundle_root!, 'tunnel', 'tunnel-client-runtime'), lock);
+    if (binary.sha256 !== d.tunnel_sha256) throw new Error('Bundled Tunnel checksum mismatch. Re-download and verify the release package.');
+    return binary;
+  }
   const names = ['tunnel-client-runtime','tunnel-client'];
   const candidates = [
     path.join(ROOT,'.runtime','bin',lock.upstream.commit,'tunnel-client-runtime'),
@@ -63,6 +70,7 @@ async function command(binary: string, args: string[], cwd: string) {
   });
 }
 export async function buildTunnel() {
+  if (distribution()) throw new Error('Precompiled distributions already include Tunnel. Source builds require a separate source checkout.');
   const lock=await readLock(); let source=path.join(ROOT,lock.submodule_path);
   try { await access(path.join(source,'go.mod')); }
   catch {

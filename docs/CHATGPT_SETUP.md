@@ -65,41 +65,29 @@ This is not the browser's F12 developer-tools panel, and it does not require exp
 **Checkpoint:** developer mode is enabled for your account, and you can find the custom-app creation entry point.
 
 <a id="step-2"></a>
-## Step 2 — Install the project on your computer
+## Step 2 — Install the precompiled runtime
 
-On macOS, use Spotlight to open **Terminal**. On Linux, open your terminal application. Run the following commands in **that local terminal**, not in the ChatGPT message box. Code blocks do not include a shell prompt; execute one line at a time.
+Open Terminal on the computer you want ChatGPT to access. Follow the [precompiled installation guide](BINARY_INSTALL.md): choose the matching v1.0.0 archive, verify its SHA-256 against `SHA256SUMS`, extract it, and run its `./install.sh`. The runtime includes Node, native dependencies and the pinned Tunnel; no Node/npm/Go/compiler installation is required. Publisher signing and Apple notarization are intentionally skipped, so review any OS approval before running downloaded software.
 
-Check the installed tools first. Node.js must be **24 or newer**:
-
-```bash
-node --version
-npm --version
-git --version
-```
-
-If Node.js is missing, follow the [official Node.js installation instructions](https://nodejs.org/en/download), reopen the terminal, and check again. On macOS, follow the system's Command Line Tools installation prompt if Git or native build tools are missing. Other prerequisites are in [README requirements](../README.md#requirements). Do not run this project with `sudo`.
-
-Choose a directory in which to keep the source, then run:
+For Apple Silicon, after downloading and verifying:
 
 ```bash
-git clone https://github.com/dolibali/mcp-dev-runtime.git
-cd mcp-dev-runtime
+tar -xzf mcp-dev-runtime-1.0.0-darwin-arm64.tar.gz
+cd mcp-dev-runtime-1.0.0-darwin-arm64
 ./install.sh
 ```
 
-A private repository requires GitHub access. For `Repository not found`, check repository access and Git authentication before troubleshooting Tunnel. With an already-downloaded source archive, skip `git clone` and enter the extracted project directory.
+Use the filename for your platform on Linux or Intel Mac. The installer copies a versioned program directory, creates only missing user configuration, and registers `mcp-dev-runtime` plus `mdr` when conflict-free. It does not start a service or download dependencies. If the short command was skipped, substitute `mcp-dev-runtime` for every `mdr` below. Follow the printed PATH instruction when needed:
 
-The setup installs the exact npm dependency lock, builds MCP Dev Runtime, creates the three local configuration files only when missing, and verifies or builds the exact Tunnel source pinned by `tunnel.lock.json`. It does **not** require your Tunnel ID or API key yet and never installs system packages with sudo, Homebrew or apt. If a Tunnel build is needed but Git, Go or `make` is missing, install the named prerequisite using its official/system instructions and rerun `./install.sh`.
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+mdr paths
+mdr doctor --offline
+```
 
-For the first connection, you can keep `cwd: "."` in `config.json` and launch from the repository root. To change the default workspace, use an existing absolute directory. `cwd` is not a filesystem allowlist. Run subsequent terminal commands from this repository too. Re-running setup is safe for the local config files: existing `config.json`, `launcher.config.json` and `runtime.env` are preserved.
+`mdr paths` shows actual configuration/log locations, not proposed future directories. The generated runtime config defaults to your home directory; change `cwd` to an existing absolute workspace if needed. It is a default directory, not a filesystem allowlist. Keep loopback binding and never run MDR with sudo.
 
-Keep the default listener on `127.0.0.1`; do not expose this unrestricted runtime publicly. Edit configuration as plain-text JSON with double quotes, no comments and no trailing comma. Already have this checkout? Enter its directory instead of cloning over it, and do not reinstall dependencies underneath active tasks. Native Windows is unsupported; see the requirements before starting on another platform.
-
-**Checkpoint:** the script ends with `MCP Dev Runtime setup complete` and the offline diagnostic passes. This confirms local installation, not a live ChatGPT connection.
-
-Setup also registers `~/.local/bin/mcp-dev-runtime` and, when the name is free, automatically registers the shorter `mdr` entry. An existing unrelated `mdr` is never overwritten; setup simply skips the short alias and continues. If setup prints a PATH instruction, apply that instruction before using the global command; otherwise the existing `npm run ...` commands below remain usable from this repository. Registration never changes your shell profiles or starts a service. See [global command usage](../README.md#global-command).
-
-For shorter typing, use [`mdr`](../README.md#short-command) when setup reports that it was registered; existing same-named tools are never overwritten. Service log locations and viewing commands are listed in [the README log guide](../README.md#logs).
+**Checkpoint:** installation completes and offline doctor passes. This establishes local installation, not a live Tunnel connection. Existing source checkouts can keep their [source workflow](../README.md#install); do not run npm setup inside a precompiled package or overwrite source-owned command entries. Log instructions: [README logs](../README.md#logs).
 
 <a id="step-3"></a>
 ## Step 3 — Create a Tunnel and find its real ID
@@ -156,75 +144,49 @@ The key's principal must independently have Read + Use on that tunnel; selecting
 **Checkpoint:** you have a runtime API key, not an admin key, ChatGPT password, key name, or abbreviated preview.
 
 <a id="step-5"></a>
-## Step 5 — Put both values in local configuration
+## Step 5 — Fill the local credentials file
 
-Return to the terminal in the project directory. Create files without overwriting existing configuration:
+The installer already created a private `runtime.env` and configured the launcher to read it. Use `mdr paths` to locate the launcher configuration, then open the adjacent `runtime.env` with a plain-text editor. Defaults are macOS `~/Library/Application Support/mcp-dev-runtime/runtime.env` and Linux `~/.config/mcp-dev-runtime/runtime.env` (absolute XDG overrides are respected).
+
+For the macOS default:
 
 ```bash
-umask 077
-test -f launcher.config.json || cp launcher.config.example.json launcher.config.json
-test -f runtime.env || cp .env.example runtime.env
-chmod 600 runtime.env
-nano runtime.env
+nano "$HOME/Library/Application Support/mcp-dev-runtime/runtime.env"
 ```
 
-Replace the placeholder to the right of each equals sign with your own value, one setting per line:
+Replace the two values with your own real credentials, one per line:
 
 ```dotenv
 CONTROL_PLANE_TUNNEL_ID=tunnel_00000000000000000000000000000000
 CONTROL_PLANE_API_KEY=replace-with-your-own-runtime-key
 ```
 
-The zero-filled ID and `replace-with-your-own-runtime-key` are **not usable credentials**. Paste the actual values without smart quotes, embedded newlines, or Markdown backticks. `runtime.env` must be a plain-text file, not `runtime.env.txt`.
+These example values are **not valid credentials**. Do not include smart quotes, Markdown backticks or embedded line breaks. In nano use **Control+O → Enter**, then **Control+X** (Control, not Command). Do not screenshot, print or paste the secret into chat/Git; keep the file private mode `0600`. A leaked key should be revoked/replaced, not only removed from the latest text. [Official API-key safety guidance](https://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety).
 
-In nano, use **Control+O → Enter** to save, then **Control+X** to exit. On macOS this is Control, not Command. Do not screenshot the file. It is excluded by `.gitignore`; never force it into a commit with `git add -f`.
+The generated launcher has `env_file: "runtime.env"`, resolved relative to its own configuration file. Nonempty exported environment variables still take precedence. Source installations instead use their existing project-local env file and launcher settings; no credential migration is automatic.
 
-A plain-text editor is an alternative when nano is unavailable. Do not diagnose the key by running `cat runtime.env`, dumping environment variables, or printing its value. A secret copied into chat or Git should be revoked/replaced, not merely hidden from the latest version. See [OpenAI's API key safety guidance](https://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety).
-
-This guide loads the file explicitly with `--env-file runtime.env`; the launcher does not unconditionally load a file of that name. Nonempty exported environment variables take precedence. If editing the file still uses an old account, inspect how the terminal environment is configured without printing the secret values.
-
-**Checkpoint:** both real values are in a local file, not in chat or the repository.
+**Checkpoint:** both actual values are saved locally, not in chat or the repository.
 
 <a id="step-6"></a>
-## Step 6 — Verify the Tunnel client and start both local services
+## Step 6 — Verify and start the local services
 
-### 6.1 Verify what the one-click setup installed
-
-The default `./install.sh` from step 2 has already prepared the Tunnel client. Confirm the verified binary can be resolved:
+The precompiled package includes its fixed Tunnel. `tunnel-setup` checks the bundled version and checksum; it does not create a Platform tunnel, issue keys, download latest code or require Go. Source builds remain a separate workflow.
 
 ```bash
-npm run tunnel:setup
+mdr tunnel-setup
+mdr up --background
+mdr status
+mdr doctor
+mdr smoke
 ```
 
-If you intentionally ran `./install.sh --local-only`, or setup previously stopped because a build prerequisite was missing, rerun the normal setup after installing the prerequisite:
+Do not also start `mdr serve` or `npm start` on the same ports: `up` already owns both MCP and Tunnel. A successful `doctor` checks local MCP/tool discovery and selected Tunnel readiness; `smoke` should print `LOCAL MCP SMOKE PASSED`. `status` is concise, `status --verbose` adds operational detail, and `status --json` gives the full machine state. Uptime includes seconds.
 
-```bash
-./install.sh
-```
+The defaults remain MCP `127.0.0.1:3001` and separate Tunnel health `127.0.0.1:9098`. On a conflict, review owned tasks, stop the selected instance, and edit the actual config files reported by `mdr paths`; preserve loopback binding and use distinct free ports. The global `mdr smoke` follows the selected configuration. Changing local ports does not change the Tunnel ID. [Port instructions](DEPLOYMENT.md#ports).
 
-The installer first tries to reuse an already-compatible binary. If none exists, it fetches the exact upstream commit from [tunnel.lock.json](../tunnel.lock.json), builds the narrow `tunnel-client-runtime`, verifies its reported source version and commit, and stores the binary plus a SHA-256 build receipt under ignored `.runtime/bin/<commit>/`. Use `./install.sh --force-tunnel-build` only when you deliberately want to repeat that exact build. `tunnel:setup` and the installer manage only the local executable; **they do not create Platform tunnels or API keys**.
+Raw curl probes are optional diagnostics, not additional required setup steps. Logs are outside the binary installation; use the actual Logs path from `mdr paths` and [the log guide](../README.md#logs). `mdr down` stops the owned instance and tasks; it is not a read-only check. Background startup is not OS boot-service installation and does not keep a sleeping computer online.
 
-### 6.2 Start and check
-
-**Do not also run standalone `npm start`.** In this guide, `up` already starts MCP and Tunnel. If your own manually started instance occupies the same ports, stop it in its terminal first; do not kill an unknown process.
-
-```bash
-npm run up -- --env-file runtime.env --background
-npm run doctor
-npm run smoke
-```
-
-Check that `doctor` reports `PASS`, `runtime.ok` and `protocol.ok` are true, and the managed supervisor's `health.availability` is `ready`. Inspect toolchain results and history warnings too. `smoke` should report `LOCAL MCP SMOKE PASSED`. With the standard configuration files created above, `doctor` reads the selected configuration, so you do not need to type port numbers for routine diagnostics. `npm run status` gives a short daily summary; add `-- --verbose` for more detail or `-- --json` for the full machine-readable state.
-
-**Default ports:** local MCP uses `127.0.0.1:3001`; Tunnel's separate health listener uses `127.0.0.1:9098`. Keep them unless they conflict with an existing service. On a conflict, change the affected `port` in `config.json` or `tunnel_health_port` in `launcher.config.json`, preserve loopback binding, and restart only after checking active work. Use distinct, unused ports and pass a changed MCP URL to `smoke`. The Tunnel ID does not change. [Port-change procedure](DEPLOYMENT.md#ports).
-
-You do not have to run two more `curl` commands after a successful `doctor` check. Raw `/healthz` and `/readyz` requests are kept as **optional troubleshooting** in [direct component probes](DEPLOYMENT.md#direct-probes); they help isolate a failure when combined diagnostics are not working.
-
-Keep the computer awake, online, and running the services while proceeding. Background startup is not boot-service installation and does not keep a sleeping computer online. These are local checks; the complete ChatGPT-to-computer round trip is still untested.
-
-**Checkpoint:** both MCP and Tunnel are ready, with successful diagnostics.
-
-For daily checks from **any terminal directory**, use `mdr status`, `mdr doctor` and `mdr smoke` when the short command was registered (the long `mcp-dev-runtime` forms are equivalent). Use `mdr status --verbose` for additional operational detail and `mdr status --json` only when the complete object is needed. To start with just `mdr up --background`, first merge `"env_file": "runtime.env"` into the existing launcher configuration; do not overwrite the file. `mdr down` stops the selected managed instance and its owned tasks, so it is not a read-only check.
+**Checkpoint:** local services and diagnostics are ready. Keep the computer awake/online; the following ChatGPT tool call is still required to verify the full round trip.
 
 <a id="step-7"></a>
 ## Step 7 — Create the ChatGPT app and choose Connection: Tunnel

@@ -17,3 +17,7 @@ Pinned source commit: `70bb5a7e1305596f0216d7b18d0b7765d58576d5`. The optional G
 ### Official onboarding reference images
 
 The three PNG files in `docs/images/openai/` are unmodified copies of `docs/images/tunnel-create-modal.png`, `docs/images/tunnel-permissions-role.png`, and `docs/images/chatgpt-connector-tunnel-select.png` from the OpenAI tunnel-client repository at the source commit above. They are upstream documentation illustrations, not screenshots of this project's maintainer account or a claim that every current account has the same interface. The source is distributed under Apache-2.0; attribution and exact source links are in `docs/images/openai/README.md`. The upstream `LICENSE` and `NOTICE` are retained in that directory.
+
+## Precompiled v1 distributions
+
+Precompiled archives include a pinned official Node.js runtime and its complete LICENSE, a locally built runtime-only Tunnel and its LICENSE/NOTICE plus Go module license inventory, and production npm packages with their installed licenses. `SBOM.spdx.json` inventories the shipped npm packages, Node and Tunnel; `licenses/GO-MODULES.json` records the Go module graph. `BUILD-MANIFEST.json` identifies the exact source commit, toolchain and file hashes. Publisher signing and Apple notarization are explicitly skipped in v1.0.0. This does not claim the embedded Node or Go binaries are devoid of upstream/ad-hoc signatures.

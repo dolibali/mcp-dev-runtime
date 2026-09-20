@@ -10,6 +10,8 @@ const tunnel=JSON.parse(readFileSync('tunnel.lock.json','utf8'));
 assert.equal(pkg.version,npmLock.version);assert.equal(pkg.version,npmLock.packages[''].version);
 assert.equal(pkg.version,tunnel.runtime_version);assert.equal(pkg.license,'Apache-2.0');
 assert.equal(CONTRACT_VERSION,tunnel.contract_version);
+const toolchain=JSON.parse(readFileSync('release-toolchain.lock.json','utf8'));
+assert.equal(readFileSync('.node-version','utf8').trim(),toolchain.node_version);
 const tools=JSON.parse(readFileSync('contracts/tools.json','utf8')).tools;
 assert.equal(tools.length,6);for(const t of tools){assert(t.inputSchema);assert(t.outputSchema);}
 for(const name of ['LICENSE','NOTICE','THIRD_PARTY_NOTICES.md','SECURITY.md','CONTRIBUTING.md'])assert(readFileSync(name).length>0);

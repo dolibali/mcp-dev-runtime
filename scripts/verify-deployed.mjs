@@ -94,7 +94,8 @@ try {
   const args={patch,workdir:dir,request_id:'live-patch-'+path.basename(dir)};
   const applied=await call('apply_patch',args);assert(applied.applied&&!applied.isError);
   assert.deepEqual(await call('apply_patch',args),applied);pass('apply_patch multi-file and retry');
-  const tested=await drain(await exec('node --test --test-reporter=tap calc.test.cjs'));
+  const quotedNode = "'" + process.execPath.replaceAll("'", "'\\''") + "'";
+  const tested=await drain(await exec(quotedNode+' --test --test-reporter=tap calc.test.cjs'));
   assert.equal(tested.exit_code,0);assert(tested.output.includes('# pass'));pass('real generated code tests',{exit_code:tested.exit_code});
   const mv=await call('apply_patch',{workdir:dir,patch:'*** Begin Patch\n*** Update File: calc.cjs\n*** Move to: renamed.cjs\n@@\n-exports.multiply = (a,b) => a*b;\n+exports.multiply = (a,b) => b*a;\n*** Delete File: calc.test.cjs\n*** End Patch\n'});
   assert(mv.applied&&!mv.isError);assert((await fs.readFile(path.join(dir,'renamed.cjs'),'utf8')).includes('b*a'));pass('patch update, move and delete');
@@ -129,7 +130,9 @@ try {
   }
   await fs.rm(dir,{recursive:true,force:true});
   report.finished_at=new Date().toISOString();
-  await fs.mkdir(new URL('../reports/',import.meta.url),{recursive:true});
-  await fs.writeFile(new URL('../reports/deployed-verification.json',import.meta.url),JSON.stringify(report,null,2)+'\n');
+  const reportDir=process.env.MDR_VERIFICATION_REPORT_DIR??new URL('../reports/',import.meta.url);
+  await fs.mkdir(reportDir,{recursive:true});
+  const reportFile=typeof reportDir==='string'?path.join(reportDir,'deployed-verification.json'):new URL('deployed-verification.json',reportDir);
+  await fs.writeFile(reportFile,JSON.stringify(report,null,2)+'\n');
   console.log(JSON.stringify({status:report.status,checks:report.checks.length,instance_id:report.instance_id,report:'reports/deployed-verification.json'}));
 }

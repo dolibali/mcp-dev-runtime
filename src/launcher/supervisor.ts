@@ -3,7 +3,7 @@ import { createServer as tcpServer } from 'node:net';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { finished } from 'node:stream/promises';
 import { mkdir, readFile, writeFile, rename, unlink, rmdir, stat, chmod } from 'node:fs/promises';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import path from 'node:path';
 import { NAME, VERSION } from '../version.js';
 import { loadConfig } from '../config.js';
@@ -12,12 +12,14 @@ import { resolveTunnel, readLock } from './tunnel.js';
 import { ROOT, type LaunchOptions } from './options.js';
 import { RotatingLog } from './rotating-log.js';
 import { probePair } from './health.js';
+import { layout } from './layout.js';
+import { privateDirectory } from './private-files.js';
 
 export type State = {
   run_id: string; pid: number; state: 'starting'|'ready'|'stopping'; version: string;
   control_socket: string; mcp_url: string; mcp_health: string; tunnel_health: string;
   mcp_instance?: string; mcp_pid?: number; tunnel_pid?: number; tunnel_version?: string;
-  tunnel_sha256?: string; tunnel_source_commit?: string; started_at: string;
+  tunnel_sha256?: string; tunnel_source_commit?: string; started_at: string; log_directory?: string;
 };
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 const alive = (pid: number) => {try {process.kill(pid,0);return true;}catch(e){return (e as NodeJS.ErrnoException).code==='EPERM';}};
@@ -57,10 +59,18 @@ export async function supervise(o: LaunchOptions) {
   if(config.port===0)throw new Error('Managed startup requires a fixed MCP port; use serve for an ephemeral port.');
   if(config.port===o.tunnel_health_port)throw new Error('MCP and Tunnel health ports must differ.');
   const env=await launchEnvironment(o),binary=await resolveTunnel(o.tunnel_bin),lock=await readLock();
-  await mkdir(o.state_dir,{recursive:true,mode:0o700});
+  if(layout().mode==='binary')await privateDirectory(o.state_dir);
+  else await mkdir(o.state_dir,{recursive:true,mode:0o700});
   const lockDir=path.join(o.state_dir,'launch.lock'),stateFile=path.join(o.state_dir,'supervisor.json');
-  const socket=path.join(o.state_dir,'control.sock');
-  if(Buffer.byteLength(socket)>100)throw new Error('State directory path is too long for a POSIX socket; choose a shorter --state-dir.');
+  let socket=path.join(o.state_dir,'control.sock');
+  if(Buffer.byteLength(socket)>100){
+    // State remains in the configured directory; only the IPC endpoint needs a short path.
+    const base=path.join('/tmp','mdr-'+process.getuid!());await privateDirectory(base);
+    const short=path.join(base,createHash('sha256').update(path.resolve(o.state_dir)).digest('hex').slice(0,24));
+    await privateDirectory(short);socket=path.join(short,'control.sock');
+  }
+  if(layout().mode==='binary')await privateDirectory(o.logs_dir??o.state_dir);
+  else await mkdir(o.logs_dir??o.state_dir,{recursive:true,mode:0o700});
   try {await mkdir(lockDir,{mode:0o700});}
   catch(e){
     if((e as NodeJS.ErrnoException).code!=='EEXIST')throw e;
@@ -79,7 +89,7 @@ export async function supervise(o: LaunchOptions) {
   const state:State={run_id:runId,pid:process.pid,state:'starting',version:VERSION,control_socket:socket,
     mcp_url:`http://${host}:${config.port}${config.mcp_path}`,mcp_health:`http://${host}:${config.port}${config.health_path}`,
     tunnel_health:`http://127.0.0.1:${o.tunnel_health_port}`,tunnel_source_commit:lock.upstream.commit,
-    tunnel_version:binary.version,tunnel_sha256:binary.sha256,started_at:new Date().toISOString()};
+    tunnel_version:binary.version,tunnel_sha256:binary.sha256,started_at:new Date().toISOString(),log_directory:o.logs_dir??o.state_dir};
   const children:ChildProcess[]=[],streams:RotatingLog[]=[];
   let health:Awaited<ReturnType<typeof probePair>>|undefined,healthTimer:NodeJS.Timeout|undefined;
   let healthInFlight:Promise<void>|undefined;
@@ -115,10 +125,10 @@ export async function supervise(o: LaunchOptions) {
   process.once('SIGTERM',onSignal);process.once('SIGINT',onSignal);
   async function start(command: string,args: string[],childEnv:NodeJS.ProcessEnv,label:string) {
     if(cancelled||stopping)throw new Error('Startup cancelled');
-    const filename=path.join(o.state_dir,label+'.log');
+    const filename=path.join(o.logs_dir??o.state_dir,label+'.log');
     const stream=new RotatingLog(filename,o.log_max_bytes,o.log_files);streams.push(stream);
     stream.on('error',()=>{failed=new Error(`${label} log write failed`);if(startupFinished)onSignal();});
-    const child=spawn(command,args,{cwd:ROOT,env:childEnv,stdio:['ignore','pipe','pipe']});children.push(child);
+    const child=spawn(command,args,{cwd:layout().working_dir,env:childEnv,stdio:['ignore','pipe','pipe']});children.push(child);
     const secrets=[env.CONTROL_PLANE_API_KEY,env.OPENAI_API_KEY,env.OPENAI_ADMIN_KEY].filter((x):x is string=>!!x);
     for(const input of [child.stdout!,child.stderr!]){
       input.setEncoding('utf8');let pending='';

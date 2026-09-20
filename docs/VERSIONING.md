@@ -4,7 +4,7 @@ The project, tool contract and upstream Tunnel have different release boundaries
 
 | Identity | Source of truth | Purpose |
 | --- | --- | --- |
-| Project version | `package.json` and npm lock | Runtime/launcher release, currently 0.3.0 |
+| Project version | `package.json` and npm lock | Runtime/launcher release, currently 1.0.0 |
 | Tool contract | `CONTRACT_VERSION`, tool JSON | Observable tool behavior, currently 3.1 |
 | Tunnel source version | `tunnel.lock.json` | Upstream informational version, currently 0.0.14 |
 | Tunnel source commit | lock + submodule gitlink | Exact compatibility input, currently 70bb5a7… |
@@ -20,7 +20,7 @@ Using project version 0.0.14 simply because Tunnel uses 0.0.14 would hide indepe
 4. Run runtime, protocol and launcher tests. Check real Tunnel readiness using a dedicated authorized Tunnel, then separately verify hosted tools.
 5. Publish the project release with the compatible source version, full SHA, variants and executed platform matrix.
 
-An upstream version string proves what the executable reports, not publisher authenticity. Locally built binaries are identified by source pin and recorded hash. If official prebuilt assets are introduced later, pin URL, version, architecture and a checksum from trusted upstream release metadata; verify platform signing requirements. No such unverified automatic download is part of 0.2.0.
+An upstream version string proves what the executable reports, not publisher authenticity. Locally built binaries are identified by source pin and recorded hash. If official prebuilt assets are introduced later, pin URL, version, architecture and a checksum from trusted upstream release metadata; verify platform signing requirements. Precompiled releases obtain Node from pinned official archive hashes and build Tunnel at the pinned commit. They do not download an unverified latest binary on user machines.
 
 ## Submodule versus source archive
 
@@ -28,7 +28,7 @@ Git checkouts use a pinned optional submodule. Source archives include `.gitmodu
 
 ## Breaking changes
 
-Record all changes to tool names, argument semantics, result meanings, CLI defaults and retained process behavior. Before 1.0, minor versions can contain breaking changes but must include migration notes. Fixes without intentional contract changes use a patch release. This is the project's policy, not a claim about upstream's release rules.
+Record all changes to tool names, argument semantics, result meanings, CLI defaults and retained process behavior. From 1.0 onward, incompatible public-tool/CLI/config changes require a major release; compatible additions use a minor version and compatible fixes use a patch version. Explicit existing configurations must remain honored. This is the project's policy, not a claim about upstream's release rules.
 
 ## Routine project version bump
 

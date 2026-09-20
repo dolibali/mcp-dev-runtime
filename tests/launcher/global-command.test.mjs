@@ -256,7 +256,7 @@ test('global CLI: default config, doctor, smoke, repeat up and down address one 
   const short = await withPath(f.binDir, () => installCommand({ ...f, name: 'mdr' }));
   const shortRun = args => exec(short.path, args, { cwd: f.caller, env: f.env, timeout: 25000 });
   const concise = (await shortRun(['status'])).stdout;
-  assert.match(concise, /mcp-dev-runtime 0\.3\.0/);
+  assert(concise.includes('mcp-dev-runtime ' + JSON.parse(await readFile(path.join(repo, 'package.json'), 'utf8')).version));
   assert.match(concise, /Status\s+ready/);
   assert.match(concise, /MCP\s+ready\s+http:\/\/127\.0\.0\.1:/);
   assert.match(concise, /Tunnel\s+ready/);

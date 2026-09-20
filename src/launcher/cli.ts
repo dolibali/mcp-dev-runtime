@@ -11,8 +11,11 @@ import { resolveTunnel, buildTunnel, readLock } from './tunnel.js';
 import { loadConfig } from '../config.js';
 import { HistoryStore } from '../runtime/history-store.js';
 import { randomUUID } from 'node:crypto';
+import { layout, launcherConfigPath } from './layout.js';
+import { initializeUser } from './initialize.js';
 const help=`${NAME} ${VERSION}
 Commands:
+  init                                Create missing user configuration (binary distribution)
   serve [--transport http|stdio ...]   Run the MCP server without Tunnel
   up [--background]                   Start MCP and the locked Tunnel together
   status [--verbose|--json]           Show the managed instance
@@ -24,10 +27,11 @@ Commands:
   versions                            Show project/tool-contract/Tunnel version pair
   history-clear --confirm              Clear this config's disk history while its writer is stopped
 Options:
-  --launcher-config FILE              Launcher JSON (defaults to package-local file)
+  --launcher-config FILE              Launcher JSON (source-local or binary user config)
   --config FILE                       MCP runtime JSON
   --tunnel-bin FILE                    Explicit compatible Tunnel binary
   --state-dir DIR                     Local state and log directory
+  --logs-dir DIR                      Separate diagnostic log directory
   --env-file FILE                      Read dotenv data without evaluating shell code
   --shell-env                          Load login-shell configuration only when keys missing
   --tunnel-health-port PORT            Default 9098
@@ -38,7 +42,7 @@ Windows native is not supported. No Codex, Agent or model API is invoked.
 Management commands use this installation's configuration and working-directory base.
 Explicit relative path flags resolve from the caller's directory; serve keeps caller cwd.
 `;
-const pathFlags = new Set(['--launcher-config','--config','--tunnel-bin','--state-dir','--env-file']);
+const pathFlags = new Set(['--launcher-config','--config','--tunnel-bin','--state-dir','--logs-dir','--env-file']);
 function absolutePathArgs(args: string[]): string[] {
   const result = [...args];
   for (let i = 0; i < result.length; i++) {
@@ -127,7 +131,16 @@ async function main(){
   // Resolve user-provided paths before switching the management cwd. The MCP
   // child already starts from ROOT; doctor and history-clear must use that same base.
   const args = absolutePathArgs(originalArgs);
-  process.chdir(ROOT);
+  process.chdir(layout().working_dir);
+  if(command==='init'){
+    parseArgs({args,options:{}});
+    const result=await initializeUser();
+    for(const file of result.created)console.log('Created: '+file);
+    for(const file of result.preserved)console.log('Preserved: '+file);
+    console.log('Fill your Tunnel ID and API key locally in: '+result.env_file);
+    console.log('Then run: mcp-dev-runtime up --background');
+    return;
+  }
   if(command==='doctor'){
     parseArgs({args,options:{config:{type:'string'},'launcher-config':{type:'string'},json:{type:'boolean'},offline:{type:'boolean'}}});
     await runScript('doctor.mjs',args);return;
@@ -146,18 +159,21 @@ async function main(){
   }
   if(command==='paths'){
     const {values}=parseArgs({args,options:{
-      'launcher-config':{type:'string'},'state-dir':{type:'string'},json:{type:'boolean'}
+      'launcher-config':{type:'string'},'state-dir':{type:'string'},'logs-dir':{type:'string'},json:{type:'boolean'}
     }});
     const overrides:Record<string,unknown>={};
     if(values['state-dir']!==undefined)overrides.state_dir=path.resolve(values['state-dir']);
-    const launcherFile=path.resolve(values['launcher-config']??path.join(ROOT,'launcher.config.json'));
+    if(values['logs-dir']!==undefined)overrides.logs_dir=path.resolve(values['logs-dir']);
+    const launcherFile=launcherConfigPath(values['launcher-config']);
     const o=await options(values['launcher-config'],overrides);
     const result={
       package_root:ROOT,
       launcher_config:launcherFile,
       runtime_config:o.runtime_config??null,
+      env_file:o.env_file??null,
       state_dir:o.state_dir,
-      logs_dir:o.state_dir
+      logs_dir:o.logs_dir??o.state_dir,
+      cache_dir:layout().mode==='source'?layout().cache_dir:null
     };
     if(values.json){console.log(JSON.stringify(result,null,2));return;}
     console.log([
@@ -166,30 +182,33 @@ async function main(){
       row('Package',result.package_root),
       row('Launcher',result.launcher_config),
       row('Runtime cfg',result.runtime_config??'none'),
+      ...(result.env_file?[row('Env file',result.env_file)]:[]),
       row('State',result.state_dir),
-      row('Logs',result.logs_dir)
+      row('Logs',result.logs_dir),
+      ...(result.cache_dir?[row('Cache',result.cache_dir)]:[])
     ].join('\n'));
     return;
   }
   if(command==='status'){
     const {values}=parseArgs({args,options:{
-      'launcher-config':{type:'string'},'state-dir':{type:'string'},verbose:{type:'boolean'},json:{type:'boolean'}
+      'launcher-config':{type:'string'},'state-dir':{type:'string'},'logs-dir':{type:'string'},verbose:{type:'boolean'},json:{type:'boolean'}
     }});
     if(values.verbose&&values.json)throw new Error('status accepts either --verbose or --json, not both.');
     const overrides:Record<string,unknown>={};
     if(values['state-dir']!==undefined)overrides.state_dir=path.resolve(values['state-dir']);
+    if(values['logs-dir']!==undefined)overrides.logs_dir=path.resolve(values['logs-dir']);
     const o=await options(values['launcher-config'],overrides);
     const state=await current(o.state_dir);
-    console.log(values.json?JSON.stringify(state,null,2):formatStatus(state,o.state_dir,values.verbose??false));
+    console.log(values.json?JSON.stringify(state,null,2):formatStatus(state,o.logs_dir??o.state_dir,values.verbose??false));
     return;
   }
   const {values}=parseArgs({args,options:{
     'launcher-config':{type:'string'},config:{type:'string'},'tunnel-bin':{type:'string'},
-    'state-dir':{type:'string'},'env-file':{type:'string'},'shell-env':{type:'boolean'},
+    'state-dir':{type:'string'},'logs-dir':{type:'string'},'env-file':{type:'string'},'shell-env':{type:'boolean'},
     'tunnel-health-port':{type:'string'},'ready-timeout-ms':{type:'string'},background:{type:'boolean'},build:{type:'boolean'},confirm:{type:'boolean'}
   }});
   const overrides:Record<string,unknown>={};
-  for(const [flag,key] of [['config','runtime_config'],['tunnel-bin','tunnel_bin'],['state-dir','state_dir'],['env-file','env_file']] as const){
+  for(const [flag,key] of [['config','runtime_config'],['tunnel-bin','tunnel_bin'],['state-dir','state_dir'],['logs-dir','logs_dir'],['env-file','env_file']] as const){
     if(values[flag]!==undefined)overrides[key]=path.resolve(values[flag]!);
   }
   if(values['shell-env']!==undefined)overrides.shell_env=values['shell-env'];
@@ -213,11 +232,13 @@ async function main(){
   if(command==='tunnel-setup'){const r=values.build?await buildTunnel():await resolveTunnel(o.tunnel_bin);console.log(JSON.stringify(r,null,2));return;}
   if(command==='down'){console.log(JSON.stringify(await stopManaged(o.state_dir),null,2));return;}
   if(command!=='up')throw new Error(`Unknown command: ${command}`);
+  if(layout().mode==='binary'&&!o.runtime_config)throw new Error('User configuration is missing; run mcp-dev-runtime init first.');
   const existing=await current(o.state_dir);
   if(existing.state==='ready'||existing.state==='starting'){console.log(JSON.stringify({already_running:true,...existing},null,2));return;}
   if(!values.background){await supervise(o);return;}
   await mkdir(o.state_dir,{recursive:true,mode:0o700});
-  const log=path.join(o.state_dir,'launcher.log');
+  await mkdir(o.logs_dir??o.state_dir,{recursive:true,mode:0o700});
+  const log=path.join(o.logs_dir??o.state_dir,'launcher.log');
   try{if((await stat(log)).size>10*1024*1024){await unlink(log+'.1').catch(e=>{if(e.code!=='ENOENT')throw e;});await rename(log,log+'.1');}}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;}
   const fd=await open(log,'a',0o600);
   const child=spawn(process.execPath,[fileURLToPath(import.meta.url),'up',...args.filter(a=>a!=='--background')],{
@@ -227,7 +248,7 @@ async function main(){
   const until=Date.now()+o.ready_timeout_ms*2+15000;
   while(Date.now()<until){
     const state=await current(o.state_dir);
-    if(state.state==='ready'){console.log(JSON.stringify({...state,log_directory:o.state_dir},null,2));return;}
+    if(state.state==='ready'){console.log(JSON.stringify({...state,log_directory:o.logs_dir??o.state_dir},null,2));return;}
     if(failed)throw new Error(`Background startup failed; inspect ${log}.`);
     await new Promise(r=>setTimeout(r,200));
   }

@@ -1,6 +1,6 @@
 {
   "name": "mcp-dev-runtime",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "Local development tools over MCP: shell, terminal sessions, patches and images. No agent or model calls.",
   "scripts": {
     "setup": "bash ./install.sh",
@@ -27,7 +27,9 @@
     "release:check": "npm run build && node scripts/release-check.mjs",
     "release:source": "npm run release:check && node scripts/source-archive.mjs",
     "version": "node scripts/sync-version.mjs",
-    "versions:sync": "node scripts/sync-version.mjs"
+    "versions:sync": "node scripts/sync-version.mjs",
+    "release:bundle": "node scripts/release/build.mjs",
+    "verify:bundle": "node scripts/release/verify.mjs"
   },
   "keywords": [
     "mcp",
@@ -37,7 +39,7 @@
     "chatgpt",
     "secure-mcp-tunnel"
   ],
-  "author": "",
+  "author": "dolibali <zh98810@gmail.com>",
   "license": "Apache-2.0",
   "type": "module",
   "private": true,
@@ -84,5 +86,9 @@
   "os": [
     "darwin",
     "linux"
-  ]
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dolibali/mcp-dev-runtime.git"
+  }
 }

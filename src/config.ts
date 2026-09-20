@@ -71,5 +71,6 @@ export async function validateConfig(config: Config): Promise<Config> {
 }
 export async function loadConfig(filename?: string, overrides: Record<string, unknown> = {}): Promise<Config> {
   const fromFile = filename ? JSON.parse(await readFile(filename, 'utf8')) : {};
-  return validateConfig(configSchema.parse({ ...fromFile, ...overrides }));
+  // Resolve a missing cwd at invocation time, not when the schema was imported.
+  return validateConfig(configSchema.parse({ cwd: process.cwd(), ...fromFile, ...overrides }));
 }
