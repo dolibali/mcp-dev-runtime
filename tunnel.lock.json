@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "runtime_version": "1.0.0",
+  "runtime_version": "1.0.1",
   "contract_version": "3.1",
   "upstream": {
     "repository": "https://github.com/openai/tunnel-client.git",

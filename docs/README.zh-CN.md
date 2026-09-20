@@ -12,7 +12,7 @@
 
 > **使用边界：**命令以服务所在的系统用户权限执行。本项目没有沙箱、命令白名单、额外审批层或多用户隔离。请保留回环地址监听，只连接可信客户端。返回的文件内容、日志和图片会进入调用方客户端；本地执行不代表数据只在本地处理。连接电脑前请阅读 [SECURITY.md](../SECURITY.md)。
 
-**预编译 v1.0.0：**[下载对应平台运行包](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.0.0) · [安装与升级指南](BINARY_INSTALL.zh-CN.md)。内置 Node、原生依赖和固定版本 Tunnel，无需安装编译工具。本版暂不进行发布者签名和 Apple 公证。
+**预编译 v1.0.1：**[下载对应平台运行包](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.0.1) · [安装与升级指南](BINARY_INSTALL.zh-CN.md)。内置 Node、原生依赖和固定版本 Tunnel，无需安装编译工具。本版暂不进行发布者签名和 Apple 公证。
 
 ## 目录
 
@@ -81,9 +81,9 @@ macOS 上需要本地编译依赖时，可用 `xcode-select --install` 安装 Xc
 <a id="install"></a>
 ## 一、安装
 
-**推荐：**下载[预编译发行版](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.0.0)，核对 SHA-256、解压并运行其中的 `./install.sh`。[预编译指南](BINARY_INSTALL.zh-CN.md)说明用户目录、命令、共存、升级和回退；这个安装器不编译或下载依赖。
+**推荐：**下载[预编译发行版](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.0.1)，核对 SHA-256、解压并运行其中的 `./install.sh`。[预编译指南](BINARY_INSTALL.zh-CN.md)说明用户目录、命令、共存、升级和回退；这个安装器不编译或下载依赖。
 
-**当前开发分支：**完整卸载统一使用 `./uninstall.sh`。脚本会先列出所有准备删除的 MDR 自有路径，只有用户明确输入 `y` 才继续。已经正式发布且不可修改的 v1.0.0 压缩包早于这个功能，因此其中仍只有命令入口级的 `./install.sh --unregister`；下一个预编译版本会在安装时把稳定的 `uninstall.sh` 保存到用户目录，不需要长期保留下载解压目录。
+**v1.0.1：**完整卸载统一使用 `./uninstall.sh`。脚本会先列出所有准备删除的 MDR 自有路径，只有用户明确输入 `y` 才继续；预编译安装还会把稳定的 `uninstall.sh` 保存到用户目录，不需要长期保留下载解压目录。不可修改的 v1.0.0 压缩包早于这个功能，因此仍只有命令入口级的 `./install.sh --unregister`。
 
 ### 源码开发替代方式
 
@@ -114,7 +114,7 @@ cd mcp-dev-runtime
 <a id="global-command"></a>
 ### 在任意目录使用全局命令
 
-两种安装方式提供同样的 CLI。预编译版使用内置 Node 和用户级配置；下面的 `npm run command:*` 说明专用于源码 checkout。当前开发分支完整卸载使用 `./uninstall.sh`；v1.0.0 仍保留原有的命令入口级 `./install.sh --unregister`。见[预编译安装](BINARY_INSTALL.zh-CN.md)。
+两种安装方式提供同样的 CLI。预编译版使用内置 Node 和用户级配置；下面的 `npm run command:*` 说明专用于源码 checkout。v1.0.1 完整卸载使用 `./uninstall.sh`；v1.0.0 仍保留原有的命令入口级 `./install.sh --unregister`。见[预编译安装](BINARY_INSTALL.zh-CN.md)。
 
 安装成功后，会在 `~/.local/bin/mcp-dev-runtime` 注册**当前用户的全局命令**。安装器还会自动尝试注册短命令 `mdr`；如果这个名字已被其他程序占用，只跳过短命令，不影响整个安装成功。两个入口都仍使用同一份源码、Node 程序、Tunnel 缓存和配置，不会复制第二套运行时，也不需要 `sudo`。注册后不要删除源码目录或对应 Node 安装。
 

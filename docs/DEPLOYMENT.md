@@ -2,12 +2,12 @@
 
 ## Precompiled v1 distribution
 
-For end-user installation use [BINARY_INSTALL.md](BINARY_INSTALL.md) / [中文预编译安装](BINARY_INSTALL.zh-CN.md). Current development / the next release uses one non-secret `config.json` plus private `runtime.env`; the published v1.0.0 keeps its original split configuration. Existing `launcher.config.json + config.json` installations remain supported without automatic migration. Binary packages include Node and Tunnel, so source-oriented npm/build instructions are not run inside an installed binary package.
+For end-user installation use [BINARY_INSTALL.md](BINARY_INSTALL.md) / [中文预编译安装](BINARY_INSTALL.zh-CN.md). v1.0.1 uses one non-secret `config.json` plus private `runtime.env`; the published v1.0.0 keeps its original split configuration. Existing `launcher.config.json + config.json` installations remain supported without automatic migration. Binary packages include Node and Tunnel, so source-oriented npm/build instructions are not run inside an installed binary package.
 
-Binary `init` only creates missing private config files and never copies credentials or starts a service. `paths`, `config`, `tools` and `status` report effective paths/policy without printing credential contents. Publisher signing/notarization are deliberately skipped for v1.0.0.
+Binary `init` only creates missing private config files and never copies credentials or starts a service. `paths`, `config`, `tools` and `status` report effective paths/policy without printing credential contents. Publisher signing/notarization are deliberately skipped for v1.0.1.
 
 
-First-time installation: [English README](../README.md#install) | [中文部署指南](README.zh-CN.md#install). This page is the operational reference for project 0.3.0 / contract 3.1.
+First-time installation: [English README](../README.md#install) | [中文部署指南](README.zh-CN.md#install). This page is the operational reference for project 1.0.1 / contract 3.1.
 
 For the complete browser-to-terminal walkthrough, including developer mode and where to create keys and copy Tunnel IDs, see [ChatGPT setup](CHATGPT_SETUP.md) / [ChatGPT 新手图文教程](CHATGPT_SETUP.zh-CN.md).
 

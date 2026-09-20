@@ -2,7 +2,7 @@
 
 [English](BINARY_INSTALL.md) | **简体中文**
 
-[v1.0.0 发行页](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.0.0)提供四种平台运行包。每包内置 Node.js 24.21.0、编译后的应用、对应平台的原生依赖，以及按照 `tunnel.lock.json` 精确 commit 构建的 runtime-only Tunnel。安装和运行 MDR 不要求系统另装 Node、npm、Git、Go 或编译器；你自己的开发项目需要的工具仍由自己的环境提供。
+[v1.0.1 发行页](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.0.1)提供四种平台运行包。每包内置 Node.js 24.21.0、编译后的应用、对应平台的原生依赖，以及按照 `tunnel.lock.json` 精确 commit 构建的 runtime-only Tunnel。安装和运行 MDR 不要求系统另装 Node、npm、Git、Go 或编译器；你自己的开发项目需要的工具仍由自己的环境提供。
 
 ## 选择并校验下载文件
 
@@ -18,13 +18,13 @@
 macOS 在下载目录执行：
 
 ```bash
-shasum -a 256 mcp-dev-runtime-1.0.0-darwin-arm64.tar.gz
+shasum -a 256 mcp-dev-runtime-1.0.1-darwin-arm64.tar.gz
 ```
 
 Linux 执行：
 
 ```bash
-sha256sum mcp-dev-runtime-1.0.0-linux-x64-gnu.tar.gz
+sha256sum mcp-dev-runtime-1.0.1-linux-x64-gnu.tar.gz
 ```
 
 将整段哈希与 `SHA256SUMS` 中对应文件名的值核对；文件名替换为实际架构。哈希用于核对一致性，本身不代表发布者身份。已安装 `gh` 的用户还可以执行 `gh attestation verify ARCHIVE --repo dolibali/mcp-dev-runtime`，查看独立的 GitHub 构建来源证明。
@@ -36,8 +36,8 @@ sha256sum mcp-dev-runtime-1.0.0-linux-x64-gnu.tar.gz
 以 Apple Silicon 为例：
 
 ```bash
-tar -xzf mcp-dev-runtime-1.0.0-darwin-arm64.tar.gz
-cd mcp-dev-runtime-1.0.0-darwin-arm64
+tar -xzf mcp-dev-runtime-1.0.1-darwin-arm64.tar.gz
+cd mcp-dev-runtime-1.0.1-darwin-arm64
 ./install.sh
 ```
 
@@ -66,7 +66,7 @@ mdr doctor --offline
 
 Linux 尊重绝对路径形式的 `XDG_CONFIG_HOME`、`XDG_STATE_HOME` 和 `XDG_DATA_HOME`，忽略相对值。`--prefix` 只更改程序版本目录，不更改用户配置位置；`--bin-dir` 指定命令目录。配置必须是当前用户所有、权限 `0600` 的普通文件；配置目录必须是当前用户所有、权限 `0700` 的目录。符号链接或不安全权限会被拒绝，而不是擅自修正；原有配置内容保留。
 
-当前开发分支 / 下一个预编译版本只生成一份非敏感 `config.json` 和相邻的私有 `runtime.env`，统一配置会通过 `runtime.env_file` 自动关联它。用纯文本编辑器填写真实 Tunnel ID 和运行密钥；不要把秘密值写进 JSON、聊天或命令参数。已经发布的 v1.0.0 仍保持当时的 split 配置。填写后执行：
+v1.0.1 只生成一份非敏感 `config.json` 和相邻的私有 `runtime.env`，统一配置会通过 `runtime.env_file` 自动关联它。用纯文本编辑器填写真实 Tunnel ID 和运行密钥；不要把秘密值写进 JSON、聊天或命令参数。已经发布的 v1.0.0 仍保持当时的 split 配置。填写后执行：
 
 ```bash
 mdr tunnel-setup
@@ -84,6 +84,6 @@ mdr smoke
 
 现有源码版命令不会自动改指向发行版，旧配置、凭据和 `.runtime` 也不会自动搬迁。需要共存时，用 `--no-global-command` 安装发行包并使用打印出的绝对命令路径，或指定另一个 `--bin-dir`。明确迁移时，先停止源码实例、按其说明仅卸载属于自己的命令入口，再安装发行版，并在编辑器中主动转移设置。不要让两个实例使用同一端口或历史目录。
 
-不可修改的 v1.0.0 压缩包仍提供 `./install.sh --unregister`，它只移除命令入口。**当前开发分支已经为下一个发行版加入完整的 `./uninstall.sh`。**脚本会先展示准备删除的实际 MDR 自有路径，只在明确输入 `y` 后继续；随后安全停止自己管理的实例，删除自己拥有的命令、全部已安装版本、配置/凭据、默认状态/历史、日志和缓存。安装时还会把稳定的 `uninstall.sh` 保存到用户配置目录，因此以后无需保留最初的下载解压目录。外来命令文件以及无法充分证明归属的外部自定义 state/log/history 路径都会保留，不会递归误删。
+不可修改的 v1.0.0 压缩包仍提供 `./install.sh --unregister`，它只移除命令入口。**v1.0.1 已加入完整的 `./uninstall.sh`。**脚本会先展示准备删除的实际 MDR 自有路径，只在明确输入 `y` 后继续；随后安全停止自己管理的实例，删除自己拥有的命令、全部已安装版本、配置/凭据、默认状态/历史、日志和缓存。安装时还会把稳定的 `uninstall.sh` 保存到用户配置目录，因此以后无需保留最初的下载解压目录。外来命令文件以及无法充分证明归属的外部自定义 state/log/history 路径都会保留，不会递归误删。
 
 本地客户端仍可用 `mdr serve --transport http` 或 `mdr serve --transport stdio`，无需 Tunnel。`serve` 保留调用方工作目录；启动额外实例时应显式配置 `--config` 并使用独立历史目录。源码开发和 npm 发布是另外的路径：npm 包仍保留 private，源码目录里的 `./install.sh` 仍是构建式安装器。

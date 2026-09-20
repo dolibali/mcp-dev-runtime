@@ -1,6 +1,6 @@
 # MCP Dev Runtime tool reference
 
-Project 0.3.0 keeps the six tool names and extends contract 3.1 with optional history, filtering and log-query arguments. Launcher commands are CLI operations, not additional MCP tools.
+Project 1.0.1 keeps the six default stable tool names and contract 3.1 behavior, with optional history, filtering and log-query arguments. Launcher commands are CLI operations, not additional MCP tools.
 
 # 工具接口参考
 
