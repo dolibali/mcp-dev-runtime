@@ -4,7 +4,7 @@
 
 The release workflow is the source of truth for the final per-platform result. Every published archive must pass `scripts/release/verify.mjs` on its native runner and match the same clean source commit. The release-level `VERIFICATION.json` and per-archive `BUILD-MANIFEST.json` record results, versions, platform and skipped publisher signing. Local macOS ARM64 candidates passed the package acceptance checks, including the 20 real-tool checks, under an isolated HOME and guarded PATH without system build tools. The final package gate also checks the documentation links and anchors after packaging, rather than assuming source-README anchors exist in the binary landing page.
 
-Source regressions passed 195 tests (104 unit, 32 protocol, 59 launcher) during release preparation. New coverage includes binary/source layout separation, XDG path validation, private initialization, caller-relative state/log overrides, bundle integrity and explicit signing-skip behavior. Historical checkpoints below refer to earlier development versions, not newly repeated performance or cloud tests.
+Release-preparation regressions covered binary/source layout separation, XDG path validation, private initialization, caller-relative state/log overrides, bundle integrity and explicit signing-skip behavior. The release-hardening pass also verifies that the first observable ready supervisor includes a complete health snapshot, and that response-loss recovery follows explicit output cursors until the original process actually exits. Final counts and platform results belong to the workflow for the release commit. Historical checkpoints below refer to earlier development versions, not newly repeated performance or cloud tests.
 
 ## Resolved path reporting — 2026-09-20
 

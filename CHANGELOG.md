@@ -7,6 +7,7 @@
 - Separate diagnostic logs from supervisor state with optional `logs_dir`, and use a private short IPC path when required.
 - Reserve a fail-closed signing boundary; v1.0.0 deliberately skips publisher signing and Apple notarization.
 - Add native package verification, checksums, SBOM, component license records and GitHub build provenance.
+- Publish the initial health snapshot before reporting a ready supervisor, and make recovery tests wait for observed process completion rather than assuming fixed CI timing.
 
 
 - Add `paths [--json]` to show only the package/config/state/log paths actually resolved for the current installation, keeping the command compatible with future distribution layouts.

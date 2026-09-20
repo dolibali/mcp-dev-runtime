@@ -64,11 +64,26 @@ test('launcher: dotenv credentials are data rather than executable shell code',a
 });
 test('launcher: background startup, repeat startup, status and owned shutdown',async t=>{
  const f=await fixture(t);const first=JSON.parse((await f.call('up',['--background'])).stdout);assert.equal(first.state,'ready');
+ assert.equal(first.health.availability,'ready');assert.equal(first.health.mcp.ok,true);assert.equal(first.health.tunnel.ok,true);
  const second=JSON.parse((await f.call('up',['--background'])).stdout);assert.equal(second.already_running,true);assert.equal(second.run_id,first.run_id);
  const health=await (await fetch(`http://127.0.0.1:${f.mp}/healthz`)).json();assert.equal(health.server,'mcp-dev-runtime');assert.equal(health.version,VERSION);
  assert(!JSON.stringify(await readState(f.stateDir)).includes('local-mock-test-key'));
  const final=JSON.parse((await f.call('down')).stdout);assert.equal(final.state,'stopped');assert.equal((await current(f.stateDir)).state,'stopped');
  await assert.rejects(fetch(`http://127.0.0.1:${f.mp}/healthz`));
+});
+test('launcher: first observable ready state includes a complete initial health snapshot',async t=>{
+ const f=await fixture(t);await foreground(f,t);
+ const until=Date.now()+10000;let ready;
+ while(Date.now()<until){
+  const state=await current(f.stateDir);
+  if(state.state==='ready'){ready=state;break;}
+  await sleep(5);
+ }
+ assert(ready,'Launcher did not reach ready');
+ assert.equal(ready.health?.availability,'ready');
+ assert.equal(ready.health?.mcp?.ok,true);assert.equal(ready.health?.tunnel?.ok,true);
+ assert.equal(ready.health.mcp.instance_id,ready.mcp_instance);
+ assert(Number.isFinite(Date.parse(ready.health.checked_at)));
 });
 test('launcher: occupied ports are refused and unrelated listeners remain alive',async t=>{
  const f=await fixture(t);const listener=createServer(s=>s.end());await new Promise(r=>listener.listen(f.mp,'127.0.0.1',r));t.after(()=>listener.close());

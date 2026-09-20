@@ -106,8 +106,18 @@ test('HTTP: lost initial response can be recovered without launching the command
   const params={name:'exec_command',arguments:{cmd:'printf x >> lost-once; sleep 0.3; printf recovered',yield_time_ms:1000,request_id:'lost-response'},_meta:discovery.params._meta};
   const pending=fetch(h.url,{method:'POST',signal:controller.signal,headers:{...modernHeaders,'MCP-Method':'tools/call','MCP-Name':'exec_command'},body:JSON.stringify({jsonrpc:'2.0',id:'lost',method:'tools/call',params})}).catch(e=>e);
   let record;for(let i=0;i<100;i++){record=(await call('list_exec_sessions')).sessions.find(x=>x.request_id==='lost-response');if(record)break;await delay(10);}
-  assert(record,'The raw request must reach the actual runtime before aborting');controller.abort();await pending;await delay(450);
-  const r=await call('write_stdin',{session_id:record.session_id,output_cursor:0,yield_time_ms:1000});assert.equal(r.output,'recovered');assert.equal(r.exit_code,0);
+  assert(record,'The raw request must reach the actual runtime before aborting');controller.abort();await pending;
+  // Output arrival and observed process exit are separate events. Recover the
+  // same session using explicit cursors until it has actually exited; do not
+  // assume a fixed sleep guarantees that a loaded CI runner has reaped it.
+  let r,output='',cursor=0;const deadline=Date.now()+15000;
+  do {
+    assert(Date.now()<deadline,'Original session did not finish after the response was lost');
+    r=await call('write_stdin',{session_id:record.session_id,output_cursor:cursor,yield_time_ms:1000});
+    assert(!r.isError,JSON.stringify(r));assert(!r.output_gap);
+    output+=r.output;cursor=r.next_output_cursor;
+  } while(['running','terminating'].includes(r.state)||r.has_more);
+  assert.equal(output,'recovered');assert.equal(r.exit_code,0);
   assert.equal(await fs.readFile(path.join(config.cwd,'lost-once'),'utf8'),'x');
 });
 test('HTTP: session extensions terminate a running command and expose terminal state',async t=>{

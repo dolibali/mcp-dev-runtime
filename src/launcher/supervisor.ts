@@ -171,9 +171,13 @@ export async function supervise(o: LaunchOptions) {
     if(cancelled||stopping)throw new Error('Startup cancelled');
     const tunnel=await start(binary.path,[...binary.args_prefix,`--mcp.server-url=${state.mcp_url}`,`--health.listen-addr=127.0.0.1:${o.tunnel_health_port}`,'--log.level=warn','--log.format=struct-text'],env,'tunnel');
     state.tunnel_pid=tunnel.pid;await save();await waitHealth(state.tunnel_health+'/readyz',s=>s.trim()==='ready');
+    // Publish the initial health snapshot before exposing lifecycle "ready".
+    // A status request can be served while save() yields to the event loop;
+    // it must never receive ready with an absent health object in that window.
+    await refreshHealth();
+    if(failed)throw failed;
     if(cancelled||stopping)throw new Error('Startup cancelled');state.state='ready';await save();startupFinished=true;if(cancelled||failed){await stop();if(failed)throw failed;return {state:'stopped',run_id:runId};}console.log(JSON.stringify(state));
     healthTimer=setInterval(()=>{if(!stopping)void refreshHealth();},o.health_interval_ms);healthTimer.unref();
-    await refreshHealth();
     await done;if(failed)throw failed;return {state:'stopped',run_id:runId};
   }catch(e){await stop();throw e;}
   finally{process.off('SIGTERM',onSignal);process.off('SIGINT',onSignal);}
