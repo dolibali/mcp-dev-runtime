@@ -84,7 +84,12 @@ test('exec: terminate is idempotent and preserves final state',async t=>{
 test('exec: SIGTERM-resistant process is escalated and force is available',async t=>{
   const m=await manager(t,{exec:{termination_grace_ms:40}});
   const r=await m.exec({cmd:nodeCmd("process.on('SIGTERM',()=>{});console.log('ready');setInterval(()=>{},1000)"),yield_time_ms:120});
-  assert(r.output.includes('ready'));const end=await m.terminate({session_id:r.session_id});assert.equal(end.state,'terminated');assert(end.signal);
+  let ready=r.output;
+  for(let n=0;!ready.includes('ready')&&n<5;n++){
+    assert.equal(r.state,'running');
+    ready+=(await m.write({session_id:r.session_id,yield_time_ms:1000})).output;
+  }
+  assert(ready.includes('ready'));const end=await m.terminate({session_id:r.session_id});assert.equal(end.state,'terminated');assert(end.signal);
   const other=await m.exec({cmd:'sleep 10',yield_time_ms:0});assert((await m.terminate({session_id:other.session_id,force:true})).termination_confirmed);
 });
 test('exec: list supports stable pagination and rejects foreign instance cursor',async t=>{
