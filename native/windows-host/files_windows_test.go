@@ -107,7 +107,15 @@ func TestReplacementPreservesDefaultFileDACL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	replaceErr := replaceFile(source, destination)
+	daclBefore, err := windows.GetNamedSecurityInfo(longPath(destination), windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var supplied string
+	replaceErr := replaceFileWithRestore(source, destination, func(h windows.Handle, flags windows.SECURITY_INFORMATION, sd *windows.SECURITY_DESCRIPTOR) error {
+		supplied = sd.String()
+		return windows.SetKernelObjectSecurity(h, flags, sd)
+	})
 	after, err := windows.GetNamedSecurityInfo(destination, windows.SE_FILE_OBJECT, fields)
 	if err != nil {
 		t.Fatal(err)
@@ -115,6 +123,7 @@ func TestReplacementPreservesDefaultFileDACL(t *testing.T) {
 	if replaceErr != nil || before.String() != after.String() {
 		oldControl, _, _ := before.Control()
 		newControl, _, _ := after.Control()
-		t.Fatalf("default fixture DACL changed: error=%v, controls=%x/%x, before=%s, after=%s", replaceErr, oldControl, newControl, before.String(), after.String())
+		daclAfter, queryErr := windows.GetNamedSecurityInfo(longPath(destination), windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
+		t.Fatalf("default fixture DACL changed: error=%v, controls=%x/%x, before=%s, after=%s, dacl-only-before=%s, supplied=%s, dacl-only-after=%v, query-error=%v", replaceErr, oldControl, newControl, before.String(), after.String(), daclBefore.String(), supplied, daclAfter, queryErr)
 	}
 }
