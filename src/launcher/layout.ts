@@ -6,7 +6,7 @@ import { NAME, VERSION } from '../version.js';
 
 // A shipped marker, not cwd/node_modules heuristics, selects the binary layout.
 export const PACKAGE_ROOT = fileURLToPath(new URL('../../', import.meta.url));
-export type Distribution = { schema_version: 1; kind: 'binary'; version: string; platform: string; arch: string; node_version: string; tunnel_sha256: string };
+export type Distribution = { schema_version: 1; kind: 'binary'; version: string; platform: string; arch: string; node_version: string; tunnel_sha256: string; windows_host_sha256?: string };
 export function distribution(root = PACKAGE_ROOT): Distribution | null {
   let text: string;
   try { text = readFileSync(path.join(root, 'distribution.json'), 'utf8'); }
@@ -21,7 +21,8 @@ export function distribution(root = PACKAGE_ROOT): Distribution | null {
 }
 
 export function userDirectories(platform: string = process.platform, home = homedir(), env: NodeJS.ProcessEnv = process.env) {
-  if (!path.isAbsolute(home)) throw new Error('An absolute home directory is required.');
+  const hostPath = platform === 'win32' ? path.win32 : path;
+  if (!hostPath.isAbsolute(home)) throw new Error('An absolute home directory is required.');
   if (platform === 'darwin') {
     const config = path.join(home, 'Library', 'Application Support', NAME);
     return { config_dir: config, state_dir: path.join(config, 'runtime'), logs_dir: path.join(home, 'Library', 'Logs', NAME),
@@ -34,7 +35,15 @@ export function userDirectories(platform: string = process.platform, home = home
     return { config_dir: path.join(base('XDG_CONFIG_HOME', '.config'), NAME), state_dir: state, logs_dir: path.join(state, 'logs'),
       cache_dir: path.join(base('XDG_CACHE_HOME', '.cache'), NAME), releases_dir: path.join(base('XDG_DATA_HOME', '.local/share'), NAME, 'releases') };
   }
-  throw new Error('Binary distributions support macOS and Linux only.');
+  if (platform === 'win32') {
+    const qualified = (p: string) => /^[A-Za-z]:[\\/]/.test(p) || /^\\\\[^\\]+\\[^\\]+/.test(p);
+    if (!qualified(home)) throw new Error('A fully qualified Windows home directory is required.');
+    const local = env.LOCALAPPDATA && qualified(env.LOCALAPPDATA) ? env.LOCALAPPDATA : hostPath.join(home, 'AppData', 'Local');
+    const data = hostPath.join(local, NAME);
+    return { config_dir: data, state_dir: hostPath.join(data, 'state'), logs_dir: hostPath.join(data, 'logs'),
+      cache_dir: hostPath.join(data, 'cache'), releases_dir: hostPath.join(local, 'Programs', NAME, 'releases') };
+  }
+  throw new Error('Binary distributions support macOS, Linux and Windows only.');
 }
 
 export function layout() {

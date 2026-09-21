@@ -77,7 +77,10 @@ export class PatchEngine {
       if (mode !== undefined) await handle.chmod(mode);
       await handle.close(); handle = undefined;
       if (exclusive) { await fs.link(tmp, filename); } // EEXIST cannot overwrite a raced Add/Move destination.
-      else await fs.rename(tmp, filename);
+      else if (process.platform === 'win32') {
+        const { windowsReplaceFile } = await import('../platform/windows-host.js');
+        await windowsReplaceFile(tmp, filename);
+      } else await fs.rename(tmp, filename);
     } finally {
       if (handle) await handle.close().catch(() => {});
       await fs.unlink(tmp).catch(e => {
@@ -96,7 +99,8 @@ export class PatchEngine {
       const snapshot = hunk.operation === 'add' ? undefined : await this.snapshot(source, hunk.operation === 'update');
       if (hunk.operation === 'add' || hunk.move) await this.assertMissing(target);
       const canonicalTarget = await this.canonical(target);
-      const keys = [source, hunk.operation === 'delete' ? source : snapshot?.actual ?? canonicalTarget, target, canonicalTarget];
+      const keys = [source, hunk.operation === 'delete' ? source : snapshot?.actual ?? canonicalTarget, target, canonicalTarget]
+        .map(p => process.platform === 'win32' ? p.toLowerCase() : p);
       for (const key of new Set(keys)) if (touched.has(key)) throw new ToolError('DUPLICATE_PATH', 'Patch operations share a source or destination.', { path: key });
       for (const key of keys) touched.add(key);
       let data: Buffer | undefined;

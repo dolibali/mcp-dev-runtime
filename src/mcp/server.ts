@@ -26,6 +26,9 @@ export function makeServer(runtime: Runtime): McpServer {
         : '';
   const instructions = [
     skillInstructions,
+    ...(process.platform === 'win32' ? [
+      'Windows: follow the configured shell syntax; powershell.exe is 5.1 (no &&), while explicitly configured Bash uses POSIX syntax. Keep long-lived servers in active sessions: root exit cleans detached children. Use apply_patch for edits and script files for complex native arguments. Quote fully qualified drive/UNC paths. No WSL translation. Cancellation uses owned Jobs, not Unix signals.'
+    ] : []),
     'Execute development operations on this host directly. No Codex agent or model is invoked.',
     'Do not delegate development to Codex, another agent, or a model API; use these local tools directly.',
     `OS: ${os.platform()} ${os.arch()}. Default cwd: ${runtime.config.cwd}. Shell: ${runtime.config.shell}. Contract: ${CONTRACT_VERSION}.`,

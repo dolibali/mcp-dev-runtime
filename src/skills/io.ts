@@ -19,6 +19,9 @@ export function utf8Prefix(value: string, bytes: number): string {
   return data.subarray(0, end).toString('utf8');
 }
 export async function canonicalDirectory(value: string): Promise<string> {
+  if(process.platform==='win32'&&!/^(?:[A-Za-z]:[\\/]|[\\/]{2}[^\\/]+[\\/][^\\/]+)/.test(value)){
+    throw new ToolError('INVALID_WORKDIR','Windows workdir must include its drive or UNC share.');
+  }
   if (!path.isAbsolute(value) || !validPath(value)) throw new ToolError('INVALID_WORKDIR', 'workdir must be an absolute existing directory.');
   try {
     const resolved = await realpath(value);
@@ -40,7 +43,7 @@ export async function fileIdentity(file: string, root?: string): Promise<{ file:
 export async function readText(file: string, maximum: number, root?: string, prefixOnly = false) {
   const identity = await fileIdentity(file, root);
   if (!prefixOnly && identity.size > maximum) throw new ToolError('SKILL_TOO_LARGE', 'Text resource exceeds the bounded file size; split it into references.');
-  const handle = await open(identity.file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  const handle = await open(identity.file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
   try {
     const before = await handle.stat();
     if (!before.isFile() || fingerprint(before) !== identity.stamp) throw new ToolError('SKILL_CHANGED', 'Skill file changed while opening; retry from the beginning.');

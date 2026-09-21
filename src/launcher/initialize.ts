@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { layout } from './layout.js';
 import { writePrivateIfMissing } from './private-files.js';
 import { defaultToolAllowlist } from '../mcp/tool-registry.js';
+import { defaultShell } from '../platform/shell.js';
 
 // No downloads, subprocesses, credentials lookup, or automatic service start.
 export async function initializeUser() {
@@ -13,7 +14,7 @@ export async function initializeUser() {
     mcp: { transport: 'http', host: '127.0.0.1', port: 3001, path: '/mcp', health_path: '/healthz' },
     tunnel: { enabled: true, health_port: 9098, ready_timeout_ms: 30000, health_interval_ms: 5000 },
     tools: { allow: [...defaultToolAllowlist] },
-    runtime: { cwd: homedir(), shell: '/bin/bash', env_file: 'runtime.env', shell_env: false },
+    runtime: { cwd: homedir(), shell: process.platform === 'win32' ? defaultShell() : '/bin/bash', env_file: 'runtime.env', shell_env: false },
     exec: { retained_session_ms: null, max_ended_sessions: 512, maintenance_interval_ms: 30000 },
     history: { enabled: true, directory: path.join(l.state_dir, 'history'), record_command: false, record_output: false },
     logging: { level: 'info', max_bytes: 10485760, files: 3 },

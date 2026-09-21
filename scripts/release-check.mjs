@@ -19,7 +19,8 @@ assert.deepEqual(tools.map(t=>t.name).sort(),toolPolicies.map(t=>t.name).sort(),
 assert.equal(defaultToolAllowlist.length,6,'The current stable default contract must retain the six established tools.');
 assert(defaultToolAllowlist.every(name=>tools.some(t=>t.name===name)),'Every default-enabled tool must have a contract.');
 for(const name of ['LICENSE','NOTICE','THIRD_PARTY_NOTICES.md','SECURITY.md','CONTRIBUTING.md'])assert(readFileSync(name).length>0);
-for(const name of ['install.sh','uninstall.sh','scripts/setup.mjs']){const s=lstatSync(name);assert(s.isFile(),name+' must be a regular file');assert((s.mode&0o111)!==0,name+' must be executable');}
+for(const name of ['install.sh','uninstall.sh','scripts/setup.mjs']){const s=lstatSync(name);assert(s.isFile(),name+' must be a regular file');if(process.platform!=='win32')assert((s.mode&0o111)!==0,name+' must be executable');}
+for(const name of ['install.ps1','uninstall.ps1','scripts/build-windows-host.mjs'])assert(lstatSync(name).isFile());
 let files;
 try{files=execFileSync('git',['ls-files','--cached','--others','--exclude-standard','-z'],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).split('\0').filter(Boolean);}
 catch{files=JSON.parse(readFileSync('SOURCE_MANIFEST.json','utf8')).files.map(x=>x.path);}

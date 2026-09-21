@@ -3,6 +3,10 @@ import { constants } from 'node:fs';
 import path from 'node:path';
 
 export async function privateDirectory(dir: string) {
+  if (process.platform === 'win32') {
+    const { windowsSecurity } = await import('../platform/windows-host.js');
+    await windowsSecurity('private-dir', dir); return;
+  }
   await mkdir(dir, { recursive: true, mode: 0o700 });
   const info = await lstat(dir);
   if (!info.isDirectory() || info.isSymbolicLink() || info.uid !== process.getuid!() || (info.mode & 0o077) !== 0) {
@@ -17,6 +21,11 @@ export async function writePrivateIfMissing(file: string, content: string): Prom
   catch (e) {
     if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
     const info = await lstat(file);
+    if (process.platform === 'win32') {
+      if (!info.isFile() || info.isSymbolicLink()) throw new Error('Unsafe existing private configuration.');
+      const { windowsSecurity } = await import('../platform/windows-host.js');
+      await windowsSecurity('validate-private', file); return false;
+    }
     if (!info.isFile() || info.isSymbolicLink() || info.uid !== process.getuid!() || (info.mode & 0o077) !== 0) {
       throw new Error('Refusing unsafe existing configuration (must be owned by you, mode 0600, not a symlink): ' + file);
     }

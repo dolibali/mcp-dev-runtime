@@ -7,6 +7,7 @@ import { ToolError } from './runtime/errors.js';
 import { defaultToolAllowlist, validateToolAllowlist } from './mcp/tool-registry.js';
 import { isUnifiedUserConfig, runtimeConfigFromUnified } from './user-config.js';
 import { skillsConfigSchema } from './skills/config.js';
+import { defaultShell, shellKind } from './platform/shell.js';
 
 const integer = (min: number, max: number, fallback: number) => z.number().int().min(min).max(max).default(fallback);
 export const configSchema = z.strictObject({
@@ -16,7 +17,7 @@ export const configSchema = z.strictObject({
   mcp_path: z.string().startsWith('/').default('/mcp'),
   health_path: z.string().startsWith('/').default('/healthz'),
   cwd: z.string().min(1).default(process.cwd()),
-  shell: z.string().min(1).default(process.env.SHELL || '/bin/bash'),
+  shell: z.string().min(1).default(defaultShell()),
   exec: z.strictObject({
     default_login: z.boolean().default(false), default_tty: z.boolean().default(false),
     default_yield_time_ms: integer(0, 10000, 1000), max_yield_time_ms: integer(1, 10000, 10000),
@@ -62,15 +63,19 @@ export const configSchema = z.strictObject({
 export type Config = z.infer<typeof configSchema>;
 export function expandPath(value: string, base: string): string {
   if (value.includes('\0')) throw new ToolError('INVALID_PATH', 'Paths cannot contain NUL.');
-  const expanded = value === '~' ? homedir() : value.startsWith('~/') ? path.join(homedir(), value.slice(2)) : value;
+  if (process.platform === 'win32' && (/^[a-z]:(?![\\/])/i.test(value) || /^[\\/](?![\\/])/.test(value))) {
+    throw new ToolError('INVALID_PATH', 'Use a fully qualified Windows drive/UNC path, not a drive-relative or root-relative path.');
+  }
+  const expanded = value === '~' ? homedir() : value.startsWith('~/') || (process.platform === 'win32' && value.startsWith('~\\')) ? path.join(homedir(), value.slice(2)) : value;
   return path.resolve(base, expanded);
 }
 export async function validateConfig(config: Config): Promise<Config> {
-  if (process.platform === 'win32') throw new Error('This release supports macOS/Linux POSIX shells only.');
+  if (!['darwin', 'linux', 'win32'].includes(process.platform)) throw new Error('Unsupported operating system.');
   config.cwd = expandPath(config.cwd, process.cwd());
   config.shell = expandPath(config.shell, process.cwd());
   if (!(await stat(config.cwd)).isDirectory()) throw new Error('cwd must be an existing directory.');
   await access(config.shell, constants.X_OK);
+  if (process.platform === 'win32' && shellKind(config.shell) === 'unsupported') throw new Error('Unsupported Windows shell. Select PowerShell or an explicitly installed POSIX shell.');
   if (config.mcp_path === config.health_path) throw new Error('mcp_path and health_path must differ.');
   if (config.exec.default_yield_time_ms > config.exec.max_yield_time_ms ||
       config.exec.default_max_output_tokens > config.exec.max_output_tokens) throw new Error('Default budget exceeds configured maximum.');

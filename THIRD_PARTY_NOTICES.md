@@ -20,6 +20,16 @@ The Skill design was compared with public Codex source at commit
 not a change to the existing patch-engine reference pin and not a runtime dependency.
 No Codex executable, agent or model is invoked by Skill discovery/reading.
 
+## Windows OS adapter (unreleased)
+
+The Windows-only `mdr-windows-host` is independently implemented Go/Win32 code.
+It uses `golang.org/x/sys` v0.45.0 (Go Authors, BSD-3-Clause), pinned by
+`native/windows-host/go.mod` and `go.sum`. Windows bundles retain the dependency
+license under `licenses/go/` and the Go toolchain license as `licenses/GO-LICENSE`.
+Public Codex process/console architecture at commit
+`a2de8fedcc3abe3cdde09b43515db820fb6b95b5` was consulted; no Codex executable,
+sandbox, agent or model API is invoked. POSIX node-pty remains pinned unchanged.
+
 ## Optional OpenAI Secure MCP Tunnel
 
 Repository: https://github.com/openai/tunnel-client

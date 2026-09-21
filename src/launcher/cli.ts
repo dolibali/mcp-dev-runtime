@@ -44,7 +44,7 @@ Options:
   --ready-timeout-ms NUMBER            Default 30000
   --verbose                            Detailed human-readable status
   --json                               Full machine-readable status/doctor output
-Windows native is not supported. No Codex, Agent or model API is invoked.
+Windows uses native PowerShell/ConPTY with owned-process cleanup. No Codex, Agent or model API is invoked.
 Management commands use this installation's configuration and working-directory base.
 Explicit relative path flags resolve from the caller's directory; serve keeps caller cwd.
 `;
@@ -305,6 +305,25 @@ async function main(){
   const existing=await current(o.state_dir);
   if(existing.state==='ready'||existing.state==='starting'){console.log(JSON.stringify({already_running:true,...existing},null,2));return;}
   if(!values.background){await supervise(o);return;}
+  if(process.platform==='win32'){
+    const {privateDirectory}=await import('./private-files.js');
+    const {detachWindows,windowsIdentity}=await import('../platform/windows-host.js');
+    await privateDirectory(o.state_dir);await privateDirectory(o.logs_dir??o.state_dir);
+    const log=path.join(o.logs_dir??o.state_dir,'launcher.log');
+    try{if((await stat(log)).size>10*1024*1024){await unlink(log+'.1').catch(e=>{if(e.code!=='ENOENT')throw e;});await rename(log,log+'.1');}}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;}
+    const pid=await detachWindows({exe:process.execPath,args:[fileURLToPath(import.meta.url),'start',...args.filter(a=>a!=='--background')],cwd:process.cwd(),env:process.env},log);
+    const until=performance.now()+o.ready_timeout_ms*2+15000;
+    while(performance.now()<until){
+      const state=await current(o.state_dir);
+      if(state.state==='ready'){console.log(JSON.stringify({...state,log_directory:o.logs_dir??o.state_dir},null,2));return;}
+      try{await windowsIdentity(pid);}catch{throw new Error(`Background startup failed; inspect ${log}.`);}
+      await new Promise(r=>setTimeout(r,200));
+    }
+    // Do not terminate a detached PID: only the authenticated controller can stop it.
+    const state=await current(o.state_dir);
+    if(state.managed&&state.pid===pid)await stopManaged(o.state_dir);
+    throw new Error(`Background startup timed out; inspect ${log}.`);
+  }
   await mkdir(o.state_dir,{recursive:true,mode:0o700});
   await mkdir(o.logs_dir??o.state_dir,{recursive:true,mode:0o700});
   const log=path.join(o.logs_dir??o.state_dir,'launcher.log');
@@ -314,8 +333,8 @@ async function main(){
     cwd:process.cwd(),env:process.env,detached:true,stdio:['ignore',fd.fd,fd.fd]
   });
   let failed=false;child.on('error',()=>{failed=true;});child.on('exit',()=>{failed=true;});child.unref();await fd.close();
-  const until=Date.now()+o.ready_timeout_ms*2+15000;
-  while(Date.now()<until){
+  const until=performance.now()+o.ready_timeout_ms*2+15000;
+  while(performance.now()<until){
     const state=await current(o.state_dir);
     if(state.state==='ready'){console.log(JSON.stringify({...state,log_directory:o.logs_dir??o.state_dir},null,2));return;}
     if(failed)throw new Error(`Background startup failed; inspect ${log}.`);

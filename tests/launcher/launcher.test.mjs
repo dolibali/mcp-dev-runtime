@@ -3,6 +3,7 @@ import {VERSION} from '../../dist/version.js';
 import assert from 'node:assert/strict';
 import {mkdtemp,writeFile,readFile,rm,mkdir,stat} from 'node:fs/promises';
 import path from 'node:path';
+import {pathToFileURL} from 'node:url';
 import {createServer} from 'node:net';
 import {spawn,execFile} from 'node:child_process';
 import {promisify} from 'node:util';
@@ -36,7 +37,16 @@ if(${JSON.stringify(mode)}==='late-exit')setInterval(()=>{if(require('node:fs').
   const args=['--launcher-config',launchConfig,'--config',config,'--state-dir',stateDir,'--tunnel-bin',fake,'--tunnel-health-port',String(tp),'--ready-timeout-ms',String(readyTimeout)];
   const env={...process.env,CONTROL_PLANE_TUNNEL_ID:'tunnel_'+'0'.repeat(32),CONTROL_PLANE_API_KEY:'local-mock-test-key'};
   t.after(async()=>{try{await stopManaged(stateDir);}catch{}await rm(dir,{recursive:true,force:true});});
-  const call=(cmd,extra=[])=>exec(process.execPath,[cli,cmd,...args,...extra],{env,timeout:25000,maxBuffer:262144});
+  const call=async(cmd,extra=[])=>{
+    try{return await exec(process.execPath,[cli,cmd,...args,...extra],{env,timeout:25000,maxBuffer:262144});}
+    catch(error){
+      for(const name of ['launcher.log','mcp.log','tunnel.log']){
+        const log=await readFile(path.join(stateDir,name),'utf8').catch(()=>'(unavailable)');
+        error.message+='\nOwned fixture '+name+':\n'+log.slice(-8192);
+      }
+      throw error;
+    }
+  };
   return {dir,config,fake,stateDir,args,env,mp,tp,call};
 }
 async function waitState(dir,expected='ready',ms=10000){const until=Date.now()+ms;while(Date.now()<until){const s=await current(dir);if(s.state===expected)return s;await sleep(50);}throw new Error('State not reached: '+expected);}
@@ -174,13 +184,49 @@ test('launcher: dead-owner lock can be recovered without signalling its PID',asy
  const r=JSON.parse((await f.call('up',['--background'])).stdout);assert.equal(r.state,'ready');
 });
 test('launcher: simultaneous background starts do not create two instances',async t=>{
- const f=await fixture(t);const results=await Promise.allSettled([f.call('up',['--background']),f.call('up',['--background'])]);assert(results.some(r=>r.status==='fulfilled'));
+ const f=await fixture(t);const results=await Promise.allSettled([f.call('up',['--background']),f.call('up',['--background'])]);assert(results.some(r=>r.status==='fulfilled'),results.filter(r=>r.status==='rejected').map(r=>r.reason.message).join('\n'));
  const s=await waitState(f.stateDir);const successes=results.filter(r=>r.status==='fulfilled').map(r=>JSON.parse(r.value.stdout));assert(successes.every(r=>r.run_id===s.run_id));
 });
 test('launcher: empty inherited credential variables do not mask an env file',async t=>{
  const f=await fixture(t);const file=path.join(f.dir,'empty-env-test.env');await writeFile(file,'CONTROL_PLANE_TUNNEL_ID=tunnel_'+ '0'.repeat(32)+'\nCONTROL_PLANE_API_KEY=env-file-test-value\n');
  const env={...f.env,CONTROL_PLANE_API_KEY:'',CONTROL_PLANE_TUNNEL_ID:'',OPENAI_API_KEY:''};
- const r=await exec(process.execPath,[cli,'up',...f.args,'--env-file',file,'--background'],{env,timeout:15000});assert.equal(JSON.parse(r.stdout).state,'ready');
+ let r;
+ try{r=await exec(process.execPath,[cli,'up',...f.args,'--env-file',file,'--background'],{env,timeout:15000});}
+ catch(error){
+  // Capture only this synthetic fixture's diagnostics before t.after removes
+  // it. Retain the original failure; do not retry or relax readiness assertions.
+  const log=await readFile(path.join(f.stateDir,'launcher.log'),'utf8').catch(()=>'(fixture log unavailable)');
+  error.message+='\nOwned test launcher log:\n'+log.slice(-8192);throw error;
+ }
+ assert.equal(JSON.parse(r.stdout).state,'ready');
+});
+
+for(const jump of [60000,-60000])test(`launcher: readiness deadlines ignore a ${jump}ms wall-clock correction`,async t=>{
+ const f=await fixture(t,jump>0?'normal':'not-ready',jump>0?5000:1000);
+ const preload=path.join(f.dir,'clock-fixture.mjs');
+ await writeFile(preload,`
+ const originalNow=Date.now.bind(Date),originalFetch=globalThis.fetch;
+ let offset=0,changed=false;
+ Date.now=()=>originalNow()+offset;
+ globalThis.fetch=(url,...args)=>{
+   if(!changed&&String(url).endsWith('/readyz')){
+     changed=true;offset=${jump};
+     return Promise.reject(new Error('synthetic first readiness probe miss'));
+   }
+   return originalFetch(url,...args);
+ };
+ `);
+ // Change only Date.now in this disposable child. The host system clock and
+ // the real service are untouched; test timeouts themselves stay monotonic.
+ f.env.NODE_OPTIONS='--import='+pathToFileURL(preload).href;
+ const began=performance.now();
+ if(jump>0){
+   const up=JSON.parse((await f.call('up',['--background'])).stdout);
+   assert.equal(up.state,'ready');
+ }else{
+   await assert.rejects(f.call('up',['--background']),/Readiness timeout/);
+ }
+ assert(performance.now()-began<12000,'wall-clock correction changed the relative deadline');
 });
 
 test('versions: sync updates the project association without moving the upstream pin',async t=>{

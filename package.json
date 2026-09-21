@@ -3,10 +3,10 @@
   "version": "1.1.0",
   "description": "Local development tools over MCP: shell, terminal sessions, patches and images. No agent or model calls.",
   "scripts": {
-    "setup": "bash ./install.sh",
-    "uninstall": "bash ./uninstall.sh",
-    "command:install": "node scripts/global-command.mjs",
-    "command:uninstall": "node scripts/global-command.mjs --remove",
+    "setup": "node scripts/platform-entry.mjs setup",
+    "uninstall": "node scripts/platform-entry.mjs uninstall",
+    "command:install": "node scripts/platform-entry.mjs command-install",
+    "command:uninstall": "node scripts/platform-entry.mjs command-remove",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
     "test": "npm run build && node --test tests/unit/*.test.mjs",
@@ -32,7 +32,9 @@
     "version": "node scripts/sync-version.mjs",
     "versions:sync": "node scripts/sync-version.mjs",
     "release:bundle": "node scripts/release/build.mjs",
-    "verify:bundle": "node scripts/release/verify.mjs"
+    "verify:bundle": "node scripts/release/verify.mjs",
+    "build:windows-host": "node scripts/build-windows-host.mjs",
+    "test:windows": "npm run build && node --test --test-concurrency=1 tests/unit/output-cache.test.mjs tests/windows/*.test.mjs"
   },
   "keywords": [
     "mcp",
@@ -46,6 +48,9 @@
   "license": "Apache-2.0",
   "type": "module",
   "private": true,
+  "allowScripts": {
+    "node-pty@1.1.0": true
+  },
   "dependencies": {
     "@modelcontextprotocol/client": "2.0.0",
     "@modelcontextprotocol/node": "2.0.0",
@@ -69,6 +74,13 @@
   "files": [
     "install.sh",
     "uninstall.sh",
+    "install.ps1",
+    "uninstall.ps1",
+    "native/windows-host",
+    "release-toolchain.lock.json",
+    "scripts/platform-entry.mjs",
+    "scripts/build-windows-host.mjs",
+    "scripts/windows",
     "dist",
     "contracts",
     "scripts/setup.mjs",
@@ -92,7 +104,8 @@
   ],
   "os": [
     "darwin",
-    "linux"
+    "linux",
+    "win32"
   ],
   "repository": {
     "type": "git",

@@ -2,12 +2,14 @@
 
 ## Precompiled stable releases
 
-The primary v1 artifacts are four self-contained platform archives, `SHA256SUMS`, and `VERIFICATION.json`. Do not upload the maintainer's working directory, credentials, `node_modules`, or cached Tunnel binary as a release. The builder obtains pinned official Node archives, installs locked production dependencies under the matching Node, and builds the pinned Tunnel in a clean temporary checkout.
+The Windows-capable release workflow requires six native platform archives: the original four macOS/Linux tarballs plus Windows x64/ARM64 ZIPs, followed by `SHA256SUMS` and `VERIFICATION.json`. Existing v1.1.0 assets remain four-platform releases. Do not upload a maintainer working directory, credentials or cached binaries. Each production builder uses the pinned official Node archive, locked production dependencies and a clean pinned Tunnel checkout.
+
+The project explicitly approves only the already-pinned `node-pty@1.1.0` install scripts through npm's `allowScripts` policy, so npm versions that default-deny dependency scripts still build the POSIX addon. Windows installations continue using `--ignore-scripts`, which does not run those scripts; no global approval policy is changed.
 
 1. Review changes, run source regressions and binary-package validation, and bump the project version with `npm version VERSION --no-git-tag-version`. Keep `.node-version` and `release-toolchain.lock.json` consistent; do not change Tunnel pins unless deliberately reviewed.
 2. Update the bilingual installation docs and `docs/releases/vVERSION.md`. Commit normally and push the reviewed source. The release builder refuses a dirty checkout; `--allow-dirty` is only for local package testing and cannot pass the release aggregator.
-3. Run the **Precompiled release** workflow on that exact commit with `create_draft=true`. It builds and verifies on macOS ARM64/x64 and Ubuntu glibc ARM64/x64 runners, generates GitHub build provenance, and aggregates only matching, successful artifacts from that commit. Build jobs do not receive user Tunnel credentials or publishing secrets.
-4. Inspect the draft's four archives, checksums, verification report, tag target and release notes. Only then publish the draft. Do not overwrite a published release/tag to fix a defect; issue a new patch version.
+3. Run the **Precompiled release** workflow on that exact commit with `create_draft=true`. Original macOS/Linux jobs are retained; separate `windows-2025` x64 and `windows-11-arm` ARM64 jobs compile native components and verify extracted ZIPs. All six native jobs must pass; do not downgrade an ARM64 failure to an untested release artifact. Jobs do not receive user Tunnel credentials.
+4. Inspect the six archives, checksums, verification report, tag target and release notes, then publish. Windows verification reports bind the actual ZIP SHA-256. Never overwrite published assets/tags to fix a defect.
 
 The `MDR_SIGNING_MODE=skip` setting intentionally omits publisher signing and Apple notarization for v1.1.0. `scripts/release/sign.mjs` is the reserved boundary before the manifest/archive hashes are generated; any other mode currently fails closed. A future signer must be reviewed and supplied through protected release credentials. GitHub build provenance is separate from OS signing.
 
@@ -90,4 +92,4 @@ Package `private: true` prevents accidental registry publication and does not pr
 
 ## Automation and distribution boundaries
 
-GitHub Actions CI is provided for Ubuntu and macOS with Node.js 24. The manual source-package workflow generates an artifact; it does not publish a public release. Public binary releases and signed/checksummed automatic downloads require a separate release review.
+GitHub Actions CI retains Ubuntu and macOS regression jobs and adds separate Windows x64/ARM64 jobs. Windows uses `npm ci --ignore-scripts --include=optional`, the pinned Go OS adapter, native Go tests and `npm run test:windows`; this includes the original platform-neutral output/retry tests plus Windows behavior tests, not a claim that POSIX-shell fixtures run unchanged under PowerShell. Native image dependencies are verified from the actual package. The manual source-package workflow does not publish a public release. See [Windows development](WINDOWS.md).

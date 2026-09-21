@@ -19,10 +19,14 @@ export class RotatingLog extends Writable {
     rotations:this.rotations,written_bytes:this.written,queued_bytes:this.writableLength,error:this.failure};}
   private async openFile(){
     if(this.file)return;
-    const h=await fs.open(this.filename,constants.O_WRONLY|constants.O_APPEND|constants.O_CREAT|(constants.O_NOFOLLOW??0),0o600);
+    // On Windows an append-only handle may lack the write access required by
+    // FlushFileBuffers. This writer is serialized, so positioned writes retain
+    // append semantics without dropping the final durability check.
+    const flags=process.platform==='win32'?constants.O_RDWR|constants.O_CREAT:constants.O_WRONLY|constants.O_APPEND|constants.O_CREAT|(constants.O_NOFOLLOW??0);
+    const h=await fs.open(this.filename,flags,0o600);
     const s=await h.stat();
     if(!s.isFile()){await h.close();throw new Error('Diagnostic log must be a regular file.');}
-    await h.chmod(0o600);this.file=h;this.size=s.size;
+    if(process.platform!=='win32')await h.chmod(0o600);this.file=h;this.size=s.size;
     if(this.size>this.maxBytes)await this.rotate();
   }
   private async rotate(){
@@ -36,7 +40,7 @@ export class RotatingLog extends Writable {
       }
     }
     this.size=0;this.rotations++;
-    this.file=await fs.open(this.filename,constants.O_WRONLY|constants.O_APPEND|constants.O_CREAT|(constants.O_NOFOLLOW??0),0o600);
+    this.file=await fs.open(this.filename,process.platform==='win32'?constants.O_RDWR|constants.O_CREAT:constants.O_WRONLY|constants.O_APPEND|constants.O_CREAT|(constants.O_NOFOLLOW??0),0o600);
   }
   private async put(data:Buffer){
     await this.openFile();
@@ -46,7 +50,15 @@ export class RotatingLog extends Writable {
       let part=utf8Prefix(data.subarray(offset),this.maxBytes-this.size);
       if(!part.length){await this.rotate();part=utf8Prefix(data.subarray(offset),this.maxBytes);}
       if(!part.length)throw new Error('Could not split diagnostic log data.');
-      await this.file!.writeFile(part);this.size+=part.length;this.written+=part.length;offset+=part.length;
+      if(process.platform==='win32'){
+        let written=0;
+        while(written<part.length){
+          const r=await this.file!.write(part,written,part.length-written,this.size+written);
+          if(r.bytesWritten===0)throw new Error('Diagnostic log write made no progress.');
+          written+=r.bytesWritten;
+        }
+      }else await this.file!.writeFile(part);
+      this.size+=part.length;this.written+=part.length;offset+=part.length;
     }
   }
   override _write(chunk:Buffer|string,encoding:BufferEncoding,done:(error?:Error|null)=>void){

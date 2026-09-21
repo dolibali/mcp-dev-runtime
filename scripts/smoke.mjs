@@ -20,7 +20,8 @@ try {
     console.log('LOCAL MCP SMOKE PASSED');
     process.exitCode=0;
   } else {
-  let r=unpack(await client.callTool({name:'exec_command',arguments:{cmd:"printf 'local-dev-mcp-ok'",yield_time_ms:1000}}));
+  const command=process.platform==='win32'?"[Console]::Write('local-dev-mcp-ok')":"printf 'local-dev-mcp-ok'";
+  let r=unpack(await client.callTool({name:'exec_command',arguments:{cmd:command,yield_time_ms:1000}}));
   let output=r.output;const deadline=Date.now()+10000;
   while(r.state==='running'||r.state==='terminating'||r.has_more){
     assert(Date.now()<deadline,'Smoke command did not finish');

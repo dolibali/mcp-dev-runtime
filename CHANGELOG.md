@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add isolated Windows x64/ARM64 execution adapters using suspended-process Job assignment, ConPTY, framed output and actual exit codes. macOS/Linux keep their existing process backends and six stable tool contracts.
+- Add Windows user directories, private DACL checks, authenticated named-pipe lifecycle control, graceful MCP history shutdown, case-aware patch conflict checks and DACL-preserving file replacement.
+- Add native Windows ZIP build/verification, executable command wrappers, PowerShell install/uninstall, version-pointer upgrade/rollback and separate Windows CI jobs. No WSL, MSVC or globally installed Node/Go is required by the runtime packages.
+- Require native ARM64 package verification in the release workflow; cross-compilation alone is not publication evidence. Keep publisher signing skipped, existing releases unchanged and Skill tools opt-in.
+- Keep Windows cancellation/parent-disconnect handling independent from a blocked child stdin, with bounded queued input and Job cleanup before reporting completion.
+- Use monotonic elapsed time for launcher startup/shutdown deadlines so wall-clock synchronization cannot trigger premature timeouts or extend shutdown budgets.
+
 ## 1.1.0 — 2026-09-21
 
 - Add opt-in experimental `discover_skills` and `read_skill`: bounded global/project discovery, metadata-only BM25/Han lookup, exact-name disambiguation, private per-instance scoped cursors and complete UTF-8 resource reading. The six stable defaults and their schemas remain unchanged.

@@ -1,5 +1,65 @@
 # Validation record
 
+## Windows native adaptation — unreleased development checkpoint
+
+The Windows work is based on v1.1.0 commit
+`c54daf376fa8832eff11827e00da7e5f169a9184`. It has not been committed,
+pushed or released by these checks; local candidate manifests explicitly retain
+`dirty: true`. The existing live macOS MCP/Tunnel was not restarted or migrated.
+
+Windows x64 acceptance uses an isolated source copy, synthetic HOME/workspaces
+and no real Tunnel credentials. The source suite passes **35 tests**: ten shared
+output/retry tests and 25 Windows-specific tests. Coverage includes PowerShell
+UTF-8/explicit/native exits, real ConPTY input/output, Job-owned descendants,
+timeouts, history/Skills, PNG/JPEG/WebP, case aliases, CRLF and DACL-preserving
+patches, named-pipe lifecycle, command-argument forwarding, source command
+registration/removal and staged complete uninstall. It does not claim that the
+entire POSIX-specific test suite runs unchanged on Windows.
+
+An additional blocked-input regression was reproduced before fixing the native
+adapter: a child that never read stdin could prevent its owner from processing
+EOF or termination controls. Input writes now use a bounded independent queue;
+both EOF and forced-termination cases pass and confirm owned process exit.
+
+macOS ARM64 and Linux x64 (Ubuntu 24.04 under an existing WSL2 installation)
+pass **253 tests each** (140 unit, 41 protocol, 72 launcher), plus production CLI
+startup/shutdown, static release checks and output benchmarks. Linux additionally
+passes ten rounds of the two concurrent-start/credential-file regressions. WSL
+is used only as a Linux test host; the Windows runtime does not depend on WSL.
+Tests explicitly verify that ordinary POSIX execution does not load the Windows
+host, and existing tool contract files are compared against the baseline.
+
+Repeated Linux startup exposed a real wall-clock sensitivity: wall time advanced
+by about 5.3 seconds while monotonic elapsed time was only 152 milliseconds.
+Lifecycle duration budgets now use monotonic time, retaining wall-clock dates
+for stored timestamps. Isolated child-process tests simulate both forward and
+backward 60-second wall-clock corrections without changing the host clock.
+The forward case fails on the old implementation and both cases pass after the
+fix; existing POSIX forced-cleanup grace remains unchanged.
+
+Package validation is separate from source tests. The Windows verifier checks
+15 groups covering exact ZIP contents, offline self-contained installation,
+configuration preservation, actual bundled Tunnel identity, local lifecycle,
+HTTP/stdio and the six tools, opt-in Skills, rollback, conflicts and uninstall.
+Release candidates must be rebuilt and this verifier rerun after native changes;
+an old successful archive is not evidence for newly changed code.
+
+Windows ARM64 helper, native test binary and pinned Tunnel cross-compilation
+have passed. **Native Windows ARM64 execution and its ZIP acceptance have not
+been performed locally.** CI and release workflows include separate x64/ARM64
+jobs, explicitly select the Node/Go architecture, assert native runner and Node
+identity, and require both native package jobs before assembling a release.
+Those hosted jobs have been configured and checked, not executed in this local
+development operation. ARM64 compile-only results are not publication approval.
+
+Private evidence includes source manifests, Windows native/package logs, macOS
+and Linux logs, exact archive manifests and three interleaved POSIX baseline/
+candidate benchmark runs. Output benchmarks preserved all 200,000 bytes without
+duplication or loss. They measure local execution, not hosted inference or WAN
+latency, and do not prove zero overhead on every machine. Windows standard-user
+versus elevated-user coverage, other Windows versions, sleep/wake, multi-day
+soak, and real ChatGPT/Tunnel round trips remain separate acceptance items.
+
 ## Experimental local Skills — unreleased implementation checkpoint
 
 The implementation was developed against baseline `2872675e020217e5a3c900b03313dbae2f4e8629`

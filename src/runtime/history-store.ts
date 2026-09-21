@@ -73,7 +73,10 @@ export class HistoryStore {
     return path.join(this.directory, `${id}.${extension}`);
   }
   private async initialize() {
-    await fs.mkdir(this.directory, { recursive: true, mode: 0o700 });
+    if(process.platform==='win32'){
+      const {privateDirectory}=await import('../launcher/private-files.js');
+      await privateDirectory(this.directory);
+    }else await fs.mkdir(this.directory, { recursive: true, mode: 0o700 });
     const dirStat = await fs.lstat(this.directory);
     if (!dirStat.isDirectory() || dirStat.isSymbolicLink()) throw new Error('History directory must be a real dedicated directory, not a symlink.');
     await fs.chmod(this.directory, 0o700);
@@ -254,7 +257,10 @@ export class HistoryStore {
       e.accepting = false;
       try {
         if (e.record.capture_output) {
-          const f = await fs.open(this.filename(id, 'log'), constants.O_RDONLY | nofollow);
+          // FlushFileBuffers requires write access on Windows. Ignoring EPERM
+          // here would leave completed archives with their original running
+          // metadata. Keep the existing POSIX descriptor flags unchanged.
+          const f = await fs.open(this.filename(id, 'log'), (process.platform === 'win32' ? constants.O_RDWR : constants.O_RDONLY) | nofollow);
           try { await f.sync(); } finally { await f.close(); }
           e.record.output_truncated ||= e.logBytes < result.total_output_bytes;
         }

@@ -42,6 +42,24 @@ async function main() {
     } catch (error) { process.stderr.write(String(error) + '\n'); process.exit(1); }
   };
   process.once('SIGINT', stop); process.once('SIGTERM', stop);
+  if (process.platform === 'win32' && config.transport === 'http' && process.env.MDR_STDIN_CONTROL) {
+    // The Windows supervisor cannot deliver a Unix SIGTERM. A private inherited
+    // stdin channel performs orderly runtime/history shutdown instead.
+    const token = process.env.MDR_STDIN_CONTROL;
+    delete process.env.MDR_STDIN_CONTROL;
+    let pending = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', (text: string) => {
+      pending += text;
+      if (pending.length > 4096) { void stop(); return; }
+      let at: number;
+      while ((at = pending.indexOf('\n')) >= 0) {
+        const line = pending.slice(0, at); pending = pending.slice(at + 1);
+        try { const r = JSON.parse(line); if (r.type === 'shutdown' && r.token === token) void stop(); } catch { /* Reject malformed private controls. */ }
+      }
+    });
+    process.stdin.once('end', stop);
+  }
   if (config.transport === 'stdio') process.stdin.once('end', stop);
 }
 main().catch(error => { process.stderr.write(`${NAME}: ${error instanceof Error ? error.message : String(error)}\n`); process.exitCode = 1; });

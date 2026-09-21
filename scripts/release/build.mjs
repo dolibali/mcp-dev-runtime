@@ -8,6 +8,8 @@ import { createHash } from 'node:crypto';
 import { digest, inventory } from './bundle-lib.mjs';
 import { signBundle } from './sign.mjs';
 
+if (process.platform === 'win32') { await import('./build-windows.mjs'); process.exit(0); }
+
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const { values } = parseArgs({ options: { 'allow-dirty': { type: 'boolean' } } });
 process.chdir(root);

@@ -12,7 +12,12 @@ export async function launchEnvironment(o: LaunchOptions): Promise<NodeJS.Proces
   const inherited = { ...process.env };
   for (const k of ['CONTROL_PLANE_API_KEY','CONTROL_PLANE_TUNNEL_ID','OPENAI_API_KEY']) if (!inherited[k]) delete inherited[k];
   let env = { ...fromFile, ...inherited };
+  if(process.platform==='win32'){
+    const {windowsEnvironment}=await import('../platform/windows-host.js');
+    env=windowsEnvironment(fromFile,inherited);
+  }
   if ((!env.CONTROL_PLANE_API_KEY || !env.CONTROL_PLANE_TUNNEL_ID) && o.shell_env) {
+    if(process.platform==='win32')throw new Error('Windows does not source a Unix login shell. Supply exported variables or runtime.env; no profile or execution policy is modified.');
     const shell = process.env.SHELL || (process.platform === 'darwin' ? '/bin/zsh' : '/bin/bash');
     const marker = '__MCP_DEV_RUNTIME_ENV__';
     const script = `console.log(${JSON.stringify(marker)} + JSON.stringify(Object.fromEntries(${JSON.stringify(keys)}.filter(k=>process.env[k]!==undefined).map(k=>[k,process.env[k]]))))`;
@@ -37,6 +42,11 @@ export async function launchEnvironment(o: LaunchOptions): Promise<NodeJS.Proces
 }
 export function mcpEnvironment(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const copy = { ...env };
+  if(process.platform==='win32'){
+    const privateKeys=new Set(['CONTROL_PLANE_API_KEY','OPENAI_API_KEY','OPENAI_ADMIN_KEY','NODE_TEST_CONTEXT','MDR_STDIN_CONTROL']);
+    for(const key of Object.keys(copy))if(privateKeys.has(key.toUpperCase()))delete copy[key];
+    return copy;
+  }
   for (const key of ['CONTROL_PLANE_API_KEY','OPENAI_API_KEY','OPENAI_ADMIN_KEY','NODE_TEST_CONTEXT']) delete copy[key];
   return copy;
 }

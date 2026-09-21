@@ -109,7 +109,12 @@ export class ExecManager {
             s.events.emit('change');
           }
         };
-        s.handle = a.tty ? startPty(a.shell, processArgs, a.workdir, env, events) : startPipe(a.shell, processArgs, a.workdir, env, events);
+        if (process.platform === 'win32') {
+          const { startWindowsProcess } = await import('../platform/windows-process.js');
+          s.handle = await startWindowsProcess(a.shell, a.cmd, a.login, a.tty, a.workdir, env, events);
+        } else {
+          s.handle = a.tty ? startPty(a.shell, processArgs, a.workdir, env, events) : startPipe(a.shell, processArgs, a.workdir, env, events);
+        }
         if (!this.accepting || s.reason) this.beginTermination(s, true, s.reason ?? 'terminate');
         if (a.timeout_ms !== undefined && !terminalState(s.state) && !s.reason) {
           s.timeout = setTimeout(() => this.beginTermination(s, false, 'timeout'), a.timeout_ms); s.timeout.unref();

@@ -22,16 +22,19 @@ export async function inventory(root, { normalize = false } = {}) {
       if (!safeRelative(relative)) throw new Error('Unsafe bundle path: ' + relative);
       const file = path.join(dir, name), info = await lstat(file);
       if (info.isSymbolicLink()) {
+        if (process.platform === 'win32') throw new Error('Windows runtime packages must not contain reparse links: '+relative);
         const target = await readlink(file);
         const resolved = path.resolve(path.dirname(file), target);
         if (path.isAbsolute(target) || !resolved.startsWith(path.resolve(root) + path.sep)) throw new Error('External bundle symlink: ' + relative);
         files.push({ path: relative, type: 'symlink', target });
       } else if (info.isDirectory()) {
-        if (normalize) await chmod(file, 0o755);
+        if (normalize && process.platform !== 'win32') await chmod(file, 0o755);
         await walk(file, relative);
       } else if (info.isFile()) {
-        const mode = normalize ? (info.mode & 0o111 ? 0o755 : 0o644) : info.mode & 0o777;
-        if (normalize) await chmod(file, mode);
+        // NTFS DACLs are verified by the Windows installer, not POSIX mode bits.
+        // A canonical manifest mode makes extract/copy verification portable on Windows.
+        const mode = process.platform === 'win32' ? 0o666 : normalize ? (info.mode & 0o111 ? 0o755 : 0o644) : info.mode & 0o777;
+        if (normalize && process.platform !== 'win32') await chmod(file, mode);
         files.push({ path: relative, type: 'file', size: info.size, mode, sha256: await digest(file) });
       } else throw new Error('Unsupported bundle file type: ' + relative);
     }

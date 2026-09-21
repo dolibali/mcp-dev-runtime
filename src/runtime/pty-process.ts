@@ -1,8 +1,13 @@
-import * as pty from 'node-pty';
+import { createRequire } from 'node:module';
 import { constants } from 'node:os';
 import type { ProcessEvents, ProcessHandle } from './pipe-process.js';
 
+// POSIX keeps its pinned node-pty implementation. Windows must not resolve its
+// addon: the Job Object / ConPTY adapter owns Windows process lifetime instead.
+const pty: typeof import('node-pty') | null = process.platform === 'win32' ? null : createRequire(import.meta.url)('node-pty');
+
 export function startPty(shell: string, args: string[], cwd: string, env: NodeJS.ProcessEnv, events: ProcessEvents): ProcessHandle {
+  if (!pty) throw new Error('Use the native Windows execution adapter on Windows.');
   const terminal = pty.spawn(shell, args, {
     name: 'xterm-256color', cols: 120, rows: 40, cwd,
     env: Object.fromEntries(Object.entries(env).filter((x): x is [string, string] => x[1] !== undefined)),

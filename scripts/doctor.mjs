@@ -21,11 +21,17 @@ for(const name of ['rg','git','node']){
   const result=spawnSync(name==='node'?process.execPath:name,['--version'],{encoding:'utf8',timeout:3000});
   report.toolchains[name]={available:!result.error&&result.status===0,version:result.error?result.error.message:(result.stdout||result.stderr).trim().split('\n')[0]};
 }
-const root=path.resolve(path.dirname(require.resolve('node-pty')),'..');
 let helpers=0;
-for(const sub of [`prebuilds/${process.platform}-${process.arch}/spawn-helper`,'build/Release/spawn-helper']){
-  try{await stat(path.join(root,sub));await access(path.join(root,sub),constants.X_OK);helpers++;}
-  catch(e){if(e.code!=='ENOENT')throw e;}
+if(process.platform==='win32'){
+  const {windowsHostPath,windowsIdentity}=await import('../dist/platform/windows-host.js');
+  try{report.windows_adapter={path:windowsHostPath(),...(await windowsIdentity())};helpers=1;}
+  catch(e){report.windows_adapter={available:false,reason:e.message};}
+}else{
+  const root=path.resolve(path.dirname(require.resolve('node-pty')),'..');
+  for(const sub of [`prebuilds/${process.platform}-${process.arch}/spawn-helper`,'build/Release/spawn-helper']){
+    try{await stat(path.join(root,sub));await access(path.join(root,sub),constants.X_OK);helpers++;}
+    catch(e){if(e.code!=='ENOENT')throw e;}
+  }
 }
 report.pty_helper_available=helpers>0;
 report.limits={...config.exec,request_cache_ttl_ms:config.request_cache_ttl_ms,history:{...config.history}};
@@ -55,8 +61,9 @@ if(config.transport==='http'&&!values.offline){
   report.ok=report.runtime.ok&&report.protocol?.ok===true&&(!report.supervisor.managed||report.supervisor.health?.availability==='ready');
   if(report.runtime.details?.history?.state==='degraded')report.ok=false;
 }else{
-  report.ok=true;report.runtime={checked:false,reason:values.offline?'offline configuration check':'stdio transport is not started by doctor'};
+  report.ok=process.platform==='win32'?helpers>0:true;report.runtime={checked:false,reason:values.offline?'offline configuration check':'stdio transport is not started by doctor'};
 }
+if(process.platform==='win32'&&helpers===0)report.ok=false;
 if(values.json)console.log(JSON.stringify(report,null,2));
 else{
   console.log(`MCP Dev Runtime doctor: ${report.ok?'PASS':'ATTENTION REQUIRED'}`);

@@ -6,7 +6,9 @@
     "darwin-arm64": "bed7eea5325e1108f32ce5228ddd6a5f0f08a499ee42aa7442aea583702f6057",
     "darwin-x64": "1462cb3b3046b815cf8ea436d3da450ec1a9f11dac7e5a46b0ada5305d7e8097",
     "linux-arm64": "724282c3b43aec998aa9527380465b45d229e021b58035f5f4f63095eabfe5d5",
-    "linux-x64": "6e1db87ef58b8819e5d5402eff1536491b18edd8eb7bee5ef7897876e88dc5ff"
+    "linux-x64": "6e1db87ef58b8819e5d5402eff1536491b18edd8eb7bee5ef7897876e88dc5ff",
+    "win32-x64": "158f7685b44de51f6c0df1d153526cbcd3e1bc739a8dfc607721cef75de9e541",
+    "win32-arm64": "8779b1bde1d39f8d420e3b57aa657b39891af434d3de44a919044cec06785921"
   },
   "go_version": "1.27.0",
   "signing": "skipped",
@@ -14,6 +16,18 @@
     "darwin-arm64": "macOS 14",
     "darwin-x64": "macOS 15",
     "linux-arm64": "Ubuntu 22.04 (glibc, libstdc++ from GCC 12)",
-    "linux-x64": "Ubuntu 22.04 (glibc, libstdc++ from GCC 12)"
+    "linux-x64": "Ubuntu 22.04 (glibc, libstdc++ from GCC 12)",
+    "win32-x64": "Windows Server 2025 / Windows 11 x64 (native acceptance required)",
+    "win32-arm64": "Windows 11 ARM64 (native acceptance required)"
+  },
+  "go_windows_archives": {
+    "amd64": {
+      "filename": "go1.27.0.windows-amd64.zip",
+      "sha256": "f0c0a0d33ba94f4d2c5dbc887334ce678b21813504ddb3aafcb06e60a5a667c4"
+    },
+    "arm64": {
+      "filename": "go1.27.0.windows-arm64.zip",
+      "sha256": "6e0156b9788209931dd340fadc04171ce15063c17b51c92e7b86b51109626e90"
+    }
   }
 }

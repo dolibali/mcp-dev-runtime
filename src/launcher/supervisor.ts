@@ -14,6 +14,8 @@ import { RotatingLog } from './rotating-log.js';
 import { probePair } from './health.js';
 import { layout } from './layout.js';
 import { privateDirectory } from './private-files.js';
+import type { WindowsChild } from '../platform/windows-host.js';
+import type { EventEmitter } from 'node:events';
 
 export type State = {
   run_id: string; pid: number; state: 'starting'|'ready'|'stopping'; version: string;
@@ -47,12 +49,13 @@ async function available(host: string, port: number) {
 export async function stopManaged(dir: string) {
   const s=await readState(dir);if(!s)return {state:'stopped',managed:false};
   // Never signal a PID loaded from disk: request shutdown through the owning instance.
-  await control(s,'/stop');const until=Date.now()+22000;
-  while(Date.now()<until){const now=await readState(dir);if(!now||now.run_id!==s.run_id)return {state:'stopped',run_id:s.run_id};await sleep(100);}
+  await control(s,'/stop');const until=performance.now()+22000;
+  while(performance.now()<until){const now=await readState(dir);if(!now||now.run_id!==s.run_id)return {state:'stopped',run_id:s.run_id};await sleep(100);}
   throw new Error('Managed shutdown did not finish; inspect launcher logs. No unrelated process was signalled.');
 }
 export async function supervise(o: LaunchOptions) {
-  if(!['darwin','linux'].includes(process.platform))throw new Error('Windows native support is deferred. Use macOS or Linux.');
+  if(!['darwin','linux','win32'].includes(process.platform))throw new Error('Unsupported operating system.');
+  const windows=process.platform==='win32';
   const old=await current(o.state_dir);
   if(old.state==='ready'||old.state==='starting')return old;
   const config=await loadConfig(o.runtime_config,{transport:'http'});
@@ -61,17 +64,19 @@ export async function supervise(o: LaunchOptions) {
   const env=o.tunnel_enabled?await launchEnvironment(o):{...process.env};
   const binary=o.tunnel_enabled?await resolveTunnel(o.tunnel_bin):undefined;
   const lock=o.tunnel_enabled?await readLock():undefined;
-  if(layout().mode==='binary')await privateDirectory(o.state_dir);
+  if(layout().mode==='binary'||windows)await privateDirectory(o.state_dir);
   else await mkdir(o.state_dir,{recursive:true,mode:0o700});
   const lockDir=path.join(o.state_dir,'launch.lock'),stateFile=path.join(o.state_dir,'supervisor.json');
   let socket=path.join(o.state_dir,'control.sock');
-  if(Buffer.byteLength(socket)>100){
+  if(windows){
+    socket='\\\\.\\pipe\\mdr-'+createHash('sha256').update(path.resolve(o.state_dir)).digest('hex').slice(0,20)+'-'+randomUUID();
+  }else if(Buffer.byteLength(socket)>100){
     // State remains in the configured directory; only the IPC endpoint needs a short path.
     const base=path.join('/tmp','mdr-'+process.getuid!());await privateDirectory(base);
     const short=path.join(base,createHash('sha256').update(path.resolve(o.state_dir)).digest('hex').slice(0,24));
     await privateDirectory(short);socket=path.join(short,'control.sock');
   }
-  if(layout().mode==='binary')await privateDirectory(o.logs_dir??o.state_dir);
+  if(layout().mode==='binary'||windows)await privateDirectory(o.logs_dir??o.state_dir);
   else await mkdir(o.logs_dir??o.state_dir,{recursive:true,mode:0o700});
   try {await mkdir(lockDir,{mode:0o700});}
   catch(e){
@@ -83,7 +88,7 @@ export async function supervise(o: LaunchOptions) {
     if(!owner && Date.now()-(await stat(lockDir)).mtimeMs<15000)throw new Error('Another launcher is starting; retry status shortly.');
     if(state && alive(state.pid))throw new Error('State belongs to a live process; refusing automatic stale-state cleanup.');
     // Only remove the known files of a dead owner, never a recursive directory tree.
-    for(const file of [path.join(lockDir,'owner.json'),stateFile,socket])await unlink(file).catch(err=>{if(err.code!=='ENOENT')throw err;});
+    for(const file of [path.join(lockDir,'owner.json'),stateFile,...(windows?[]:[socket])])await unlink(file).catch(err=>{if(err.code!=='ENOENT')throw err;});
     await rmdir(lockDir);await mkdir(lockDir,{mode:0o700});
   }
   const runId=randomUUID();await writeFile(path.join(lockDir,'owner.json'),JSON.stringify({pid:process.pid,run_id:runId}),{mode:0o600});
@@ -97,7 +102,9 @@ export async function supervise(o: LaunchOptions) {
       tunnel_sha256:binary!.sha256
     }:{}),
     started_at:new Date().toISOString(),log_directory:o.logs_dir??o.state_dir};
-  const children:ChildProcess[]=[],streams:RotatingLog[]=[];
+  const children:(ChildProcess|WindowsChild)[]=[],streams:RotatingLog[]=[];
+  const childLabels=new Map<ChildProcess|WindowsChild,string>();
+  const childControl=windows?randomUUID():undefined;
   let health:Awaited<ReturnType<typeof probePair>>|undefined,healthTimer:NodeJS.Timeout|undefined;
   let healthInFlight:Promise<void>|undefined;
   const refreshHealth=():Promise<void>=>healthInFlight??=(async()=>{
@@ -114,16 +121,26 @@ export async function supervise(o: LaunchOptions) {
     // Stop the Tunnel first; each MCP child cleans up the executions it owns.
     for(const child of [...children].reverse()){
       if(child.exitCode!==null||child.signalCode!==null)continue;
-      child.kill('SIGTERM');const until=Date.now()+16000;
-      while(child.exitCode===null&&child.signalCode===null&&Date.now()<until)await sleep(30);
-      if(child.exitCode===null&&child.signalCode===null){child.kill('SIGKILL');await sleep(100);}
+      if(windows&&childLabels.get(child)==='mcp'){
+        (child as WindowsChild).write(JSON.stringify({type:'shutdown',token:childControl})+'\n');
+      }else child.kill(windows?'SIGKILL':'SIGTERM');
+      const until=performance.now()+16000;
+      while(child.exitCode===null&&child.signalCode===null&&performance.now()<until)await sleep(30);
+      if(child.exitCode===null&&child.signalCode===null){
+        child.kill('SIGKILL');
+        if(windows){
+          const forcedUntil=performance.now()+5500;
+          do{await sleep(30);}while(child.exitCode===null&&child.signalCode===null&&performance.now()<forcedUntil);
+          if(child.exitCode===null)throw new Error('Windows child shutdown was not confirmed; state was retained.');
+        }else await sleep(100); // Preserve the existing POSIX forced-cleanup grace.
+      }
     }
     if(server)await new Promise<void>(r=>server!.close(()=>r()));
     for(const stream of streams){stream.end();await finished(stream).catch(()=>{});}
     // Files belong to this process, verified before removing the run record.
     const disk=await readState(o.state_dir);
     if(!disk||disk.run_id===runId){
-      for(const file of [stateFile,stateFile+'.tmp',socket,path.join(lockDir,'owner.json')])await unlink(file).catch(e=>{if(e.code!=='ENOENT')throw e;});
+      for(const file of [stateFile,stateFile+'.tmp',...(windows?[]:[socket]),path.join(lockDir,'owner.json')])await unlink(file).catch(e=>{if(e.code!=='ENOENT')throw e;});
       await rmdir(lockDir);
     }
     resolveDone();
@@ -135,7 +152,11 @@ export async function supervise(o: LaunchOptions) {
     const filename=path.join(o.logs_dir??o.state_dir,label+'.log');
     const stream=new RotatingLog(filename,o.log_max_bytes,o.log_files);streams.push(stream);
     stream.on('error',()=>{failed=new Error(`${label} log write failed`);if(startupFinished)onSignal();});
-    const child=spawn(command,args,{cwd:layout().working_dir,env:childEnv,stdio:['ignore','pipe','pipe']});children.push(child);
+    const child=windows
+      ? new (await import('../platform/windows-host.js')).WindowsChild({exe:command,args,cwd:layout().working_dir,
+          env:{...childEnv,...(label==='mcp'?{MDR_STDIN_CONTROL:childControl}: {})},stdin:label==='mcp'})
+      : spawn(command,args,{cwd:layout().working_dir,env:childEnv,stdio:['ignore','pipe','pipe']});
+    children.push(child);childLabels.set(child,label);
     const secrets=[env.CONTROL_PLANE_API_KEY,env.OPENAI_API_KEY,env.OPENAI_ADMIN_KEY].filter((x):x is string=>!!x);
     for(const input of [child.stdout!,child.stderr!]){
       input.setEncoding('utf8');let pending='';
@@ -148,21 +169,27 @@ export async function supervise(o: LaunchOptions) {
       input.on('data',(text:string)=>{pending+=text;let at;while((at=pending.indexOf('\n'))>=0){log(pending.slice(0,at+1));pending=pending.slice(at+1);}if(pending.length>262144){log('[oversized unterminated log line omitted]\n');pending='';}});
       input.on('end',()=>{if(pending)log(pending);});
     }
-    child.once('close',(code,signal)=>{if(!stopping){failed=new Error(`${label} exited unexpectedly (${signal??code}). See ${filename}`);if(startupFinished)void stop().catch(e=>{failed=e;resolveDone();});}});
-    await new Promise<void>((resolve,reject)=>{child.once('spawn',resolve);child.once('error',reject);});return child;
+    const events=child as EventEmitter;
+    events.once('close',(code:number|null,signal:string|null)=>{if(!stopping){failed=new Error(`${label} exited unexpectedly (${signal??code}). See ${filename}`);if(startupFinished)void stop().catch(e=>{failed=e;resolveDone();});}});
+    await new Promise<void>((resolve,reject)=>{events.once('spawn',resolve);events.once('error',reject);});return child;
   }
   async function waitHealth(url:string,check:(value:string)=>boolean){
-    const until=Date.now()+o.ready_timeout_ms;
-    while(Date.now()<until){if(failed)throw failed;if(cancelled||stopping)throw new Error('Startup cancelled');
+    const began=performance.now(),wallBegan=Date.now();
+    // Relative readiness budgets must survive wall-clock corrections (including
+    // VM/WSL clock resynchronization). Serialized timestamps remain wall-clock.
+    const until=began+o.ready_timeout_ms;
+    while(performance.now()<until){if(failed)throw failed;if(cancelled||stopping)throw new Error('Startup cancelled');
       try{const res=await fetch(url,{signal:AbortSignal.timeout(1500)});const text=await res.text();if(res.ok&&check(text))return;}catch{}
       await sleep(150);
-    }throw new Error(`Readiness timeout at ${url}; see launcher logs.`);
+    }throw new Error(`Readiness timeout at ${url}; elapsed wall=${Date.now()-wallBegan} ms, monotonic=${Math.round(performance.now()-began)} ms; see launcher logs.`);
   }
   try{
     await available(config.host,config.port);
     if(o.tunnel_enabled)await available('127.0.0.1',o.tunnel_health_port);
     if(cancelled)throw new Error('Startup cancelled');
+    let controlReady=!windows;
     server=httpServer((req,res)=>{
+      if(!controlReady){res.writeHead(503);res.end();return;}
       if(req.headers['x-run-id']!==runId){res.writeHead(409);res.end();return;}
       if(req.url==='/status'&&req.method==='GET'){
         const reply=()=>{if(!res.destroyed){res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({...state,health,logs:streams.map(s=>s.stats)}));}};
@@ -172,7 +199,12 @@ export async function supervise(o: LaunchOptions) {
       else if(req.url==='/stop'&&req.method==='POST'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({run_id:runId,state:'stopping'}));setImmediate(onSignal);}
       else {res.writeHead(404);res.end();}
     });
-    await new Promise<void>((resolve,reject)=>{server!.once('error',reject);server!.listen(socket,()=>resolve());});await chmod(socket,0o600);await save();
+    await new Promise<void>((resolve,reject)=>{server!.once('error',reject);server!.listen(socket,()=>resolve());});
+    if(windows){
+      const {windowsSecurity}=await import('../platform/windows-host.js');
+      await windowsSecurity('pipe-acl',socket);controlReady=true;
+    }else await chmod(socket,0o600);
+    await save();
     const main=path.join(ROOT,'dist','main.js');const args=[main,...(o.runtime_config?['--config',o.runtime_config]:[]),'--transport','http'];
     const mcp=await start(process.execPath,args,mcpEnvironment(env),'mcp');state.mcp_pid=mcp.pid;await save();
     await waitHealth(state.mcp_health,text=>{const h=JSON.parse(text);if(h.server!==NAME||h.version!==VERSION||h.status!=='ok')return false;state.mcp_instance=h.instance_id;return true;});

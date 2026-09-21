@@ -24,3 +24,36 @@ jobs:
       - run: npm run test:all
       - run: npm run verify:cli
       - run: npm run release:check
+  windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2025, windows-11-arm]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      MDR_EXPECTED_WINDOWS_ARCH: ${{ matrix.os == 'windows-11-arm' && 'arm64' || 'x64' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+          architecture: ${{ env.MDR_EXPECTED_WINDOWS_ARCH }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.0'
+          cache-dependency-path: native/windows-host/go.sum
+          architecture: ${{ env.MDR_EXPECTED_WINDOWS_ARCH }}
+      - name: Require native Windows architecture
+        shell: pwsh
+        run: |
+          if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant() -ne $env:MDR_EXPECTED_WINDOWS_ARCH) { throw 'Wrong Windows runner architecture.' }
+          node -e "if(process.platform!=='win32'||process.arch!==process.env.MDR_EXPECTED_WINDOWS_ARCH)process.exit(1)"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - run: npm ci --ignore-scripts --include=optional
+      - run: npm run build:windows-host
+      - run: go test -mod=readonly ./...
+        working-directory: native/windows-host
+      - run: npm run test:windows
+      - run: npm run release:check

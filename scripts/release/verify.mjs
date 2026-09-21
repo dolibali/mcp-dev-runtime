@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+
+if (process.platform === 'win32') { await import('./verify-windows.mjs'); process.exit(0); }
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createRequire } from 'node:module';

@@ -26,7 +26,17 @@ test('distribution: platform paths honor absolute XDG overrides and ignore relat
   assert.equal(linux.config_dir, '/cfg/mcp-dev-runtime');
   assert.equal(linux.state_dir, path.join(home, '.local/state/mcp-dev-runtime'));
   assert.equal(linux.releases_dir, '/data/mcp-dev-runtime/releases');
-  assert.throws(() => userDirectories('win32', home), /macOS and Linux/);
+  assert.throws(() => userDirectories('freebsd', home), /macOS, Linux and Windows/);
+});
+test('distribution: Windows uses non-roaming per-user directories without changing POSIX paths', () => {
+  const home='C:\\test-home';
+  const win=userDirectories('win32',home,{LOCALAPPDATA:'D:\\local-data'});
+  assert.equal(win.config_dir,'D:\\local-data\\mcp-dev-runtime');
+  assert.equal(win.logs_dir,'D:\\local-data\\mcp-dev-runtime\\logs');
+  assert.equal(win.releases_dir,'D:\\local-data\\Programs\\mcp-dev-runtime\\releases');
+  const fallback=userDirectories('win32',home,{LOCALAPPDATA:'relative'});
+  assert.equal(fallback.config_dir,'C:\\test-home\\AppData\\Local\\mcp-dev-runtime');
+  assert.throws(()=>userDirectories('win32','\\root-relative',{}),/fully qualified/);
 });
 test('distribution: private configuration is exclusive, idempotent and refuses symlinks', async t => {
   const d = await temporary(t), dir = path.join(d, 'private'), file = path.join(dir, 'runtime.env');

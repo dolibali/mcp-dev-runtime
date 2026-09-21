@@ -8,6 +8,8 @@ Shell commands, interactive terminals, file patches, images and execution histor
 
 **New in v1.1.0 (opt-in experimental):** [Local Skills](docs/SKILLS.md) provides `discover_skills` / `read_skill`, bounded project/global discovery and complete instruction reading. Disabled by default; the six established tools and their schemas remain unchanged. No additional agent or model is invoked.
 
+**Windows development (unreleased):** Native Windows x64/ARM64 build targets, PowerShell/ConPTY execution and user-scoped ZIP installation are described in the [Windows guide](docs/WINDOWS.md). Published v1.1.0 archives remain macOS/Linux only. Cross-built ARM64 components are not a substitute for the required native ARM64 release acceptance.
+
 **First time connecting ChatGPT?** Follow the [illustrated, click-by-click setup guide](docs/CHATGPT_SETUP.md): enable developer mode, create a Tunnel and API key, start the local service, and select the Tunnel in ChatGPT.
 
 This is an independent community project, not an OpenAI product. The runtime executes operations itself: it does **not** launch Codex, delegate to another agent, or call a model API. It is not a remote-desktop viewer or a mouse/keyboard automation service.

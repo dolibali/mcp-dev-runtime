@@ -8,6 +8,8 @@
 
 **v1.1.0 新增（需主动启用的实验功能）：**[本机 Skill](SKILLS.zh-CN.md) 提供 `discover_skills` / `read_skill`，按项目/全局目录有界发现并完整读取指令。默认关闭，原六工具及其 schema 保持不变；不调用第二个 Agent 或模型。
 
+**Windows 开发版（未发布）：**新增 Windows x64/ARM64 原生构建目标、PowerShell/ConPTY 执行和用户级 ZIP 安装，见 [Windows 指南](WINDOWS.zh-CN.md)。现有 v1.1.0 附件仍仅为 macOS/Linux；ARM64 交叉编译不能替代正式发版前的 ARM64 原生验收。
+
 **第一次接入 ChatGPT？** 先看[一步一步的新手图文教程](CHATGPT_SETUP.zh-CN.md)：开启开发者模式、创建 Tunnel 和 API Key、启动本机服务，再在 ChatGPT 中选择隧道。
 
 这是独立的社区项目，不是 OpenAI 官方产品。运行时直接完成工具操作，**不启动 Codex、不委派给其他智能体、不调用模型 API**。它不是远程桌面查看器，也不提供鼠标、键盘和图形界面自动化服务。

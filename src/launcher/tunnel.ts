@@ -47,13 +47,14 @@ export async function resolveTunnel(explicit?: string): Promise<TunnelBinary> {
   if (explicit || process.env.TUNNEL_BIN) return inspectTunnel(path.resolve(explicit ?? process.env.TUNNEL_BIN!), lock);
   const d = distribution();
   if (d) {
-    const binary = await inspectTunnel(path.join(layout().bundle_root!, 'tunnel', 'tunnel-client-runtime'), lock);
+    const binary = await inspectTunnel(path.join(layout().bundle_root!, 'tunnel', 'tunnel-client-runtime'+(process.platform==='win32'?'.exe':'')), lock);
     if (binary.sha256 !== d.tunnel_sha256) throw new Error('Bundled Tunnel checksum mismatch. Re-download and verify the release package.');
     return binary;
   }
-  const names = ['tunnel-client-runtime','tunnel-client'];
+  const suffix=process.platform==='win32'?'.exe':'';
+  const names = ['tunnel-client-runtime'+suffix,'tunnel-client'+suffix];
   const candidates = [
-    path.join(ROOT,'.runtime','bin',lock.upstream.commit,'tunnel-client-runtime'),
+    path.join(ROOT,'.runtime','bin',lock.upstream.commit,'tunnel-client-runtime'+suffix),
     ...names.map(n=>path.join(ROOT,lock.submodule_path,'bin',n)),
     path.join(ROOT,'..','tunnel-client','bin','tunnel-client'),
     ...(process.env.PATH ?? '').split(path.delimiter).filter(Boolean).flatMap(p=>names.map(n=>path.join(p,n)))
@@ -83,9 +84,14 @@ export async function buildTunnel() {
   const sha=(await exec('git',['rev-parse','HEAD'],{cwd:source})).stdout.trim();
   if(sha!==lock.upstream.commit) throw new Error('Submodule commit differs from tunnel.lock.json; run git submodule update --init vendor/tunnel-client.');
   if((await exec('git',['status','--porcelain','--untracked-files=no'],{cwd:source})).stdout.trim()) throw new Error('Tunnel source has local modifications; refusing to label it as the locked source.');
-  await command('make',['tunnel-client-runtime'],source);
-  const built=path.join(source,'bin','tunnel-client-runtime'); await inspectTunnel(built,lock);
-  const destination=path.join(ROOT,'.runtime','bin',sha,'tunnel-client-runtime');
+  const suffix=process.platform==='win32'?'.exe':'';
+  const built=path.join(source,'bin','tunnel-client-runtime'+suffix);
+  if(process.platform==='win32'){
+    await mkdir(path.dirname(built),{recursive:true});
+    await command('go',['build','-mod=readonly','-trimpath','-buildvcs=false','-ldflags',`-X github.com/openai/tunnel-client/pkg/version.GitSHA=${sha.slice(0,7)} -X github.com/openai/tunnel-client/pkg/version.Flavor=runtime`,'-o',built,'./cmd/client-runtime'],source);
+  }else await command('make',['tunnel-client-runtime'],source);
+  await inspectTunnel(built,lock);
+  const destination=path.join(ROOT,'.runtime','bin',sha,'tunnel-client-runtime'+suffix);
   await mkdir(path.dirname(destination),{recursive:true});await copyFile(built,destination);await chmod(destination,0o755);
   const binary=await inspectTunnel(destination,lock);
   await writeFile(destination+'.json',JSON.stringify({source_commit:sha,repository:lock.upstream.repository,kind:'local-source-build',sha256:binary.sha256,built_at:new Date().toISOString()},null,2)+'\n',{mode:0o600});
