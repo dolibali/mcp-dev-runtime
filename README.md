@@ -4,13 +4,9 @@
 
 **English** | [简体中文](docs/README.zh-CN.md)
 
+> **Want to connect ChatGPT to your computer?** [English setup guide](docs/CHATGPT_SETUP.md) · [简体中文图文教程](docs/CHATGPT_SETUP.zh-CN.md)
+
 Shell commands, interactive terminals, file patches, images and execution history through six MCP tools. Connect locally over HTTP or stdio, or connect ChatGPT through the optional OpenAI Secure MCP Tunnel.
-
-**New in v1.1.0 (opt-in experimental):** [Local Skills](docs/SKILLS.md) provides `discover_skills` / `read_skill`, bounded project/global discovery and complete instruction reading. Disabled by default; the six established tools and their schemas remain unchanged. No additional agent or model is invoked.
-
-**New in v1.2.0:** Native Windows x64/ARM64 ZIPs with PowerShell/ConPTY execution, owned process-tree cleanup and user-scoped installation. See the [Windows guide](docs/WINDOWS.md). Each architecture must pass its native release tests; cross-compilation is not accepted as runtime verification.
-
-**First time connecting ChatGPT?** Follow the [illustrated, click-by-click setup guide](docs/CHATGPT_SETUP.md): enable developer mode, create a Tunnel and API key, start the local service, and select the Tunnel in ChatGPT.
 
 This is an independent community project, not an OpenAI product. The runtime executes operations itself: it does **not** launch Codex, delegate to another agent, or call a model API. It is not a remote-desktop viewer or a mouse/keyboard automation service.
 

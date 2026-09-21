@@ -58,6 +58,16 @@ Follow the current [official developer guide](https://developers.openai.com/api/
 3. Find **Developer mode**, review the warning, and enable it.
 4. Open [Plugins](https://chatgpt.com/plugins) and confirm that the page's **plus button** can create a developer-mode app. Locate the entry point for now; you do not need to submit the form yet.
 
+Current Chinese UI example — Developer mode under **Security and login**:
+
+![ChatGPT Settings showing Developer mode enabled](images/chatgpt/chatgpt-developer-mode.jpg)
+
+Then open **Plugins** and confirm that the page-level plus button is available, indicating that the current account and workspace can add a custom developer-mode app. You do not need to create it yet:
+
+![ChatGPT Plugins page with the developer-app plus button highlighted](images/chatgpt/chatgpt-plugins-add.jpg)
+
+*These screenshots show one current ChatGPT web layout. Labels and placement can change as the product UI evolves.*
+
 **If that toggle is missing:** look under **Settings → Apps → Advanced Settings → Developer mode**. Earlier interfaces may call Apps “Connectors.” The Help Center also documents an administrator route through **Workspace settings → Apps → Create**. Managed workspaces may first require an administrator to grant access under **Permissions & Roles → Connected Data**. A permission problem is not a local installation failure. See the [official help](https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt).
 
 This is not the browser's F12 developer-tools panel, and it does not require experimental browser settings.
@@ -207,6 +217,12 @@ Fill in the form as follows:
 | Scan Tools | Wait for discovery and check the six tools below |
 | Create | Review the warning and settings, then create the app |
 
+Current Chinese UI example for this project's default setup:
+
+![ChatGPT new developer app form using Tunnel and No Authentication](images/chatgpt/chatgpt-new-plugin-tunnel.jpg)
+
+*The exact wording may change, but the important choices are **Tunnel** for Connection and **No Authentication** for the default MCP layer.*
+
 **Why No Authentication here?** The project's default MCP server listens on loopback and does not implement OAuth. Tunnel still authenticates to OpenAI using the separate runtime API key. These are different authentication layers. Do not put the runtime API key into OAuth Client Secret or disable an existing enterprise authentication gateway to copy this setup. If you have added such a gateway, use its actual authentication requirements instead.
 
 **Do not enter `http://127.0.0.1:3001/mcp` under a public Server URL connection.** In this route, Tunnel forwards to that URL locally. No Authentication refers only to the default MCP layer; it does not disable OpenAI's Tunnel authorization or make the local service safe to expose on the internet. Supported MCP authentication choices are listed in the [official developer guide](https://developers.openai.com/api/docs/guides/developer-mode).
@@ -276,8 +292,14 @@ You do not need to recreate the app each time. After restarting the computer, ru
 
 For code or tool updates, follow [README operations](../README.md#operations). Keep the local service online when choosing Refresh in ChatGPT's app details. Verify optional arguments such as `label`, `capture_output`, `scope`, `archive_id`, `tail_lines`, and `search`; there is no need to enter or reveal a key during this check.
 
+![Refresh control in the ChatGPT developer app details](images/chatgpt/chatgpt-app-refresh.jpg)
+
+*Use Refresh after the local service has been updated and restarted so ChatGPT can reload the current tool definitions.*
+
 ## Images and official references
 
-The three images are unmodified copies from the OpenAI tunnel-client documentation at a fixed revision. They are stored in this repository so normal checkouts and source archives can display them without initializing the Git submodule. They are reference illustrations, not proof of your account's current interface; no generated image is presented as a product screenshot. See [image provenance and license](images/openai/README.md).
+The four screenshots under `images/chatgpt/` are maintainer-supplied examples of the ChatGPT web UI, resized or cropped for documentation and with account-specific app/version identifiers excluded. They illustrate one current layout, not a permanent UI contract.
+
+The three images under `images/openai/` are unmodified copies from the OpenAI tunnel-client documentation at a fixed revision. They are stored in this repository so normal checkouts and source archives can display them without initializing the Git submodule. They are reference illustrations, not proof of your account's current interface; no generated image is presented as a product screenshot. See [image provenance and license](images/openai/README.md).
 
 Official references: [developer mode](https://developers.openai.com/api/docs/guides/developer-mode), [Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels), [app and workspace permissions](https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt), [tunnel permissions and keys](https://github.com/openai/tunnel-client/blob/master/docs/permissions.md), and [upstream onboarding](https://github.com/openai/tunnel-client/blob/master/docs/onboarding.md). Open sign-in-required pages in your own browser; this document does not claim that anyone has signed in, created a key, or changed organization permissions on your behalf.

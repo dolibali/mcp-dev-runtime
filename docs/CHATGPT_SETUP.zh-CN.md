@@ -58,6 +58,16 @@ API Key 页面不会生成 Tunnel ID。组织 ID、工作区 ID、隧道名称�
 3. 找到 **Developer mode / 开发者模式**，阅读风险说明后开启。
 4. 打开 [Plugins 页面](https://chatgpt.com/plugins)，确认可以通过页面的**加号**创建开发者应用。先确认入口即可，不必现在提交应用表单。
 
+当前中文界面示例——在 **账户安全与登录** 中开启开发者模式：
+
+![ChatGPT 设置中的开发者模式开关](images/chatgpt/chatgpt-developer-mode.jpg)
+
+然后进入 **插件** 页面，检查右上方是否出现“+”入口，确认当前账号和工作区可以添加自定义开发者插件；此时无需实际创建：
+
+![ChatGPT 插件页面中的开发者应用创建入口](images/chatgpt/chatgpt-plugins-add.jpg)
+
+*截图展示的是当前一种 ChatGPT 网页界面；产品更新后，菜单名称和位置可能变化。*
+
 **如果你的界面没有上面的开关：**在 **Settings → Apps → Advanced Settings → Developer mode** 查找；旧界面可能将 Apps 称为 Connectors。帮助中心还给出了 **Workspace settings → Apps → Create** 的管理员入口。受管理工作区可能需要管理员先在 **Permissions & Roles → Connected Data** 授权；不要把“没有权限”误判为本机安装失败。详见[官方帮助](https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt)。
 
 这不是浏览器的 F12 开发者工具，也不需要修改浏览器实验性设置。
@@ -207,6 +217,12 @@ mdr smoke
 | Scan Tools | 等扫描完成，检查下方六个工具 |
 | Create | 阅读风险提示、确认配置，再创建应用 |
 
+本项目默认配置在当前中文界面中的填写示例：
+
+![ChatGPT 新建开发者应用，Connection 选择隧道、身份验证选择无身份验证](images/chatgpt/chatgpt-new-plugin-tunnel.jpg)
+
+*界面文字以后可能变化，但默认部署最关键的两项仍是：Connection 选择 **Tunnel / 隧道**，MCP 身份验证选择 **No Authentication / 无身份验证**。*
+
 **为什么这里选 No Authentication？** 本项目默认 MCP 监听在本机回环地址，并未实现 OAuth；Tunnel 自身仍用 Runtime API Key 向 OpenAI 认证。这是两层不同的认证。不要将 Runtime API Key 填进 OAuth Client Secret，也不要通过关闭已有的企业认证来照搬本教程。如果你另加了认证网关，以它实际需要的认证方式为准。
 
 **不要在公网 Server URL 模式里填 `http://127.0.0.1:3001/mcp`。** 这条接入路径由本机 Tunnel 转发到该地址。No Authentication 只针对默认 MCP 层，不会关闭 OpenAI 对 Tunnel 的授权，也不表示本地服务可以直接暴露公网。MCP 认证选项见[官方开发者指南](https://developers.openai.com/api/docs/guides/developer-mode)。
@@ -276,8 +292,14 @@ mdr smoke
 
 改代码或工具参数后的完整升级步骤见 [README 日常维护](README.zh-CN.md#operations)。在 ChatGPT 应用详情执行 Refresh / 刷新时应保持服务在线，核对 `label`、`capture_output`、`scope`、`archive_id`、`tail_lines`、`search` 等新参数，不必填写或公开密钥。
 
+![ChatGPT 开发者应用详情中的刷新按钮](images/chatgpt/chatgpt-app-refresh.jpg)
+
+*本地服务升级并重启后使用“刷新”，让 ChatGPT 重新读取当前工具定义。*
+
 ## 图片与官方参考
 
-三张图片均来自 OpenAI 的公开 tunnel-client 文档，按上游固定提交原样复制到本仓库，保证普通克隆或源码包也能显示，不依赖初始化 Git 子模块。它们是参考图，不是对你账号界面的实测承诺；没有使用生成式图片冒充截图。来源和许可证见[图片说明](images/openai/README.md)。
+`images/chatgpt/` 下的四张图是维护者提供的 ChatGPT 网页界面示例，为文档展示进行了缩放或裁剪，并排除了应用 ID、版本 ID 等账户实例标识。它们只说明当前一种界面布局，不构成永久 UI 约定。
+
+`images/openai/` 下的三张图片来自 OpenAI 的公开 tunnel-client 文档，按上游固定提交原样复制到本仓库，保证普通克隆或源码包也能显示，不依赖初始化 Git 子模块。它们是参考图，不是对你账号界面的实测承诺；没有使用生成式图片冒充截图。来源和许可证见[图片说明](images/openai/README.md)。
 
 官方文档：[开发者模式](https://developers.openai.com/api/docs/guides/developer-mode)、[Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels)、[应用配置与工作区权限](https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt)、[隧道权限与密钥](https://github.com/openai/tunnel-client/blob/master/docs/permissions.md)、[上游入门](https://github.com/openai/tunnel-client/blob/master/docs/onboarding.md)。页面需要登录时，请在自己的浏览器打开；本文不代表已代你登录、创建密钥或调整组织权限。

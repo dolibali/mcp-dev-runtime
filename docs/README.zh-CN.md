@@ -4,13 +4,9 @@
 
 [English](../README.md) | **简体中文**
 
+> **想把 ChatGPT 接到自己的电脑？** [简体中文图文教程](CHATGPT_SETUP.zh-CN.md) · [English setup guide](CHATGPT_SETUP.md)
+
 通过六个 MCP 工具，执行 Shell 命令、操作交互终端、应用文件补丁、读取图片、查询执行历史。既可以通过 HTTP 或 stdio 连接本地客户端，也可以借助可选的 OpenAI Secure MCP Tunnel 接入 ChatGPT。
-
-**v1.1.0 新增（需主动启用的实验功能）：**[本机 Skill](SKILLS.zh-CN.md) 提供 `discover_skills` / `read_skill`，按项目/全局目录有界发现并完整读取指令。默认关闭，原六工具及其 schema 保持不变；不调用第二个 Agent 或模型。
-
-**v1.2.0 新增：**Windows x64/ARM64 原生 ZIP 运行包、PowerShell/ConPTY 执行、自有进程树清理和用户级安装，见 [Windows 指南](WINDOWS.zh-CN.md)。每种架构都必须通过原生发布验收，不用交叉编译代替运行验证。
-
-**第一次接入 ChatGPT？** 先看[一步一步的新手图文教程](CHATGPT_SETUP.zh-CN.md)：开启开发者模式、创建 Tunnel 和 API Key、启动本机服务，再在 ChatGPT 中选择隧道。
 
 这是独立的社区项目，不是 OpenAI 官方产品。运行时直接完成工具操作，**不启动 Codex、不委派给其他智能体、不调用模型 API**。它不是远程桌面查看器，也不提供鼠标、键盘和图形界面自动化服务。
 
