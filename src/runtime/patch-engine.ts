@@ -140,7 +140,14 @@ export class PatchEngine {
             if (current.signature !== p.snapshot!.signature) throw new ToolError('FILE_CHANGED', 'Move source changed before unlink.', { path: p.source });
             await fs.unlink(p.source); change.source_removed = true;
           } else {
-            await this.writeAtomic(p.snapshot!.actual, p.data!, p.snapshot!.mode, false, warnings);
+            try {
+              await this.writeAtomic(p.snapshot!.actual, p.data!, p.snapshot!.mode, false, warnings);
+            } catch (e) {
+              // A Windows metadata-restoration failure can follow a completed
+              // replacement. Report that file in PARTIAL_APPLY, never as untouched.
+              if (e instanceof ToolError && e.details.file_replaced === true) changes.push({ operation: 'update', path: p.source });
+              throw e;
+            }
             changes.push({ operation: 'update', path: p.source });
           }
         }

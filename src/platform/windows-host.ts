@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import { ToolError } from '../runtime/errors.js';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const exec = promisify(execFile);
@@ -58,7 +59,13 @@ export async function windowsIdentity(pid: number = process.pid): Promise<{ pid:
 
 export async function windowsReplaceFile(source: string, destination: string): Promise<void> {
   try { await exec(windowsHostPath(), ['replace-file', source, destination], { windowsHide: true, timeout: 10000, maxBuffer: 16384 }); }
-  catch (e) { throw new Error((e as {stderr?:string}).stderr?.trim().slice(0,2048) || 'Windows file replacement failed; no delete-and-rename fallback was attempted.'); }
+  catch (e) {
+    const message = (e as {stderr?:string}).stderr?.trim().slice(0,2048) || 'Windows file replacement failed; no delete-and-rename fallback was attempted.';
+    if (message.includes('WINDOWS_REPLACEMENT_COMMITTED')) {
+      throw new ToolError('WINDOWS_REPLACE_PARTIAL', message, { file_replaced: true });
+    }
+    throw new Error(message);
+  }
 }
 
 type Start = { exe: string; args: string[]; cwd: string; env: NodeJS.ProcessEnv; tty?: boolean; stdin?: boolean };

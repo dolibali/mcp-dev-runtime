@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fixture } from '../helpers.mjs';
 import { PatchEngine } from '../../dist/runtime/patch-engine.js';
 import { RetryCache } from '../../dist/runtime/retry-cache.js';
+import { ToolError } from '../../dist/runtime/errors.js';
 import { parsePatch, updateText } from '../../dist/runtime/patch-parser.js';
 const patch = text => `*** Begin Patch\n${text}\n*** End Patch\n`;
 async function engine(t, hooks = {}) {const c=await fixture(t);return {cwd:c.cwd,e:new PatchEngine(c,new RetryCache(10000,32),hooks)};}
@@ -55,6 +56,21 @@ test('patch: mid-commit I/O failure reports already applied operations',async t=
   await assert.rejects(e.apply({patch:patch('*** Add File: a\n+1\n*** Add File: b\n+2')}),err=>{
     assert.equal(err.code,'PARTIAL_APPLY');assert.equal(err.details.partial,true);assert.equal(err.details.changes.length,1);return true;
   });assert(await exists(path.join(cwd,'a')));assert(!(await exists(path.join(cwd,'b'))));
+});
+test('patch: metadata failure after replacement reports the changed file as partial',async t=>{
+  const {e,cwd}=await engine(t),file=path.join(cwd,'a');
+  await fs.writeFile(file,'old\n');
+  // Inject a completed content replacement followed by a metadata failure.
+  // This is a test instance override, not a runtime/MCP input or platform branch.
+  e.writeAtomic=async(filename,data)=>{
+    await fs.writeFile(filename,data);
+    throw new ToolError('WINDOWS_REPLACE_PARTIAL','synthetic metadata failure',{file_replaced:true});
+  };
+  await assert.rejects(e.apply({patch:patch('*** Update File: a\n@@\n-old\n+new')}),error=>{
+    assert.equal(error.code,'PARTIAL_APPLY');assert.equal(error.details.partial,true);
+    assert.deepEqual(error.details.changes,[{operation:'update',path:file}]);return true;
+  });
+  assert.equal(await fs.readFile(file,'utf8'),'new\n');
 });
 test('patch: concurrent overlapping patches cannot both overwrite the same version',async t=>{
   let prepared=0,release;const ready=new Promise(r=>release=r);
