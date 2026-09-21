@@ -11,7 +11,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-func daclFixture(t *testing.T, protected bool) (string, string, string) {
+func daclFixture(t *testing.T, protected bool, inherited bool) (string, string, string) {
 	t.Helper()
 	root := t.TempDir()
 	destination, source := filepath.Join(root, "original.txt"), filepath.Join(root, "replacement.txt")
@@ -28,11 +28,19 @@ func daclFixture(t *testing.T, protected bool) (string, string, string) {
 	if protected {
 		control, flags = "P", ""
 	}
-	// Deliberately omit AUTO_INHERITED: default local-machine ACLs can hide the
-	// legacy inheritance conversion observed on both GitHub Windows runners.
+	if inherited {
+		control += "AI"
+	}
+	// Cover both legacy and modern inheritance; default local ACLs alone can
+	// hide the conversion observed on GitHub's Windows runners.
 	sd, err := windows.SecurityDescriptorFromString("D:" + control + "(A;" + flags + ";FA;;;SY)(A;" + flags + ";FA;;;BA)(A;" + flags + ";FA;;;" + u.User.Sid.String() + ")")
 	if err != nil {
 		t.Fatal(err)
+	}
+	if inherited {
+		if err = sd.SetControl(windows.SE_DACL_AUTO_INHERIT_REQ, windows.SE_DACL_AUTO_INHERIT_REQ); err != nil {
+			t.Fatal(err)
+		}
 	}
 	name, _ := windows.UTF16PtrFromString(destination)
 	h, err := windows.CreateFile(name, windows.READ_CONTROL|windows.WRITE_DAC, windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE, nil, windows.OPEN_EXISTING, 0, 0)
@@ -52,26 +60,28 @@ func daclFixture(t *testing.T, protected bool) (string, string, string) {
 
 func TestReplacementPreservesExactLegacyAndProtectedDACL(t *testing.T) {
 	for _, protected := range []bool{false, true} {
-		source, destination, before := daclFixture(t, protected)
-		if err := replaceFile(source, destination); err != nil {
-			t.Fatal(err)
-		}
-		after, err := windows.GetNamedSecurityInfo(destination, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if after.String() != before {
-			t.Fatalf("DACL changed (protected=%v): %s != %s", protected, after.String(), before)
-		}
-		data, err := os.ReadFile(destination)
-		if err != nil || string(data) != "new\r\n" {
-			t.Fatalf("content not replaced: %q %v", data, err)
+		for _, inherited := range []bool{false, true} {
+			source, destination, before := daclFixture(t, protected, inherited)
+			if err := replaceFile(source, destination); err != nil {
+				t.Fatal(err)
+			}
+			after, err := windows.GetNamedSecurityInfo(destination, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if after.String() != before {
+				t.Fatalf("DACL changed (protected=%v): %s != %s", protected, after.String(), before)
+			}
+			data, err := os.ReadFile(destination)
+			if err != nil || string(data) != "new\r\n" {
+				t.Fatalf("content not replaced: %q %v", data, err)
+			}
 		}
 	}
 }
 
 func TestReplacementReportsPostCommitDACLFailure(t *testing.T) {
-	source, destination, _ := daclFixture(t, true)
+	source, destination, _ := daclFixture(t, true, false)
 	err := replaceFileWithRestore(source, destination, func(windows.Handle, windows.SECURITY_INFORMATION, *windows.SECURITY_DESCRIPTOR) error {
 		return errors.New("synthetic DACL restore failure")
 	})
@@ -81,5 +91,30 @@ func TestReplacementReportsPostCommitDACLFailure(t *testing.T) {
 	data, readErr := os.ReadFile(destination)
 	if readErr != nil || string(data) != "new\r\n" {
 		t.Fatalf("expected committed content: %q %v", data, readErr)
+	}
+}
+
+func TestReplacementPreservesDefaultFileDACL(t *testing.T) {
+	root := t.TempDir()
+	source, destination := filepath.Join(root, "replacement.txt"), filepath.Join(root, "default.txt")
+	for file, text := range map[string]string{source: "new", destination: "old"} {
+		if err := os.WriteFile(file, []byte(text), 0666); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const fields = windows.OWNER_SECURITY_INFORMATION | windows.GROUP_SECURITY_INFORMATION | windows.DACL_SECURITY_INFORMATION
+	before, err := windows.GetNamedSecurityInfo(destination, windows.SE_FILE_OBJECT, fields)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replaceErr := replaceFile(source, destination)
+	after, err := windows.GetNamedSecurityInfo(destination, windows.SE_FILE_OBJECT, fields)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replaceErr != nil || before.String() != after.String() {
+		oldControl, _, _ := before.Control()
+		newControl, _, _ := after.Control()
+		t.Fatalf("default fixture DACL changed: error=%v, controls=%x/%x, before=%s, after=%s", replaceErr, oldControl, newControl, before.String(), after.String())
 	}
 }

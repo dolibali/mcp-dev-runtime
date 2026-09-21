@@ -59,6 +59,28 @@ func replaceFileWithRestore(source, destination string, restore func(windows.Han
 	if err != nil {
 		return fmt.Errorf("read destination DACL before replacement: %w", err)
 	}
+	if original == nil {
+		return errors.New("destination has no readable security descriptor")
+	}
+	// A read descriptor omits the set-only AUTO_INHERIT_REQ bit. When copying an
+	// already AUTO_INHERITED DACL through the low-level descriptor API, include
+	// that request bit or Windows clears AUTO_INHERITED as legacy compatibility.
+	// Work on a copy so verification still compares against the original flags.
+	writable, err := original.ToAbsolute()
+	if err != nil {
+		return fmt.Errorf("prepare saved DACL: %w", err)
+	}
+	control, _, err := original.Control()
+	if err != nil {
+		return err
+	}
+	var request windows.SECURITY_DESCRIPTOR_CONTROL
+	if control&windows.SE_DACL_AUTO_INHERITED != 0 {
+		request = windows.SE_DACL_AUTO_INHERIT_REQ
+	}
+	if err = writable.SetControl(windows.SE_DACL_AUTO_INHERIT_REQ, request); err != nil {
+		return err
+	}
 	// Hold WRITE_DAC before commit, even when the merged descriptor later denies
 	// reopening the file. No ACL error is ignored; restore the saved DACL exactly.
 	h, err := windows.CreateFile(s, windows.READ_CONTROL|windows.WRITE_DAC, windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE, nil, windows.OPEN_EXISTING, windows.FILE_FLAG_OPEN_REPARSE_POINT, 0)
@@ -70,7 +92,7 @@ func replaceFileWithRestore(source, destination string, restore func(windows.Han
 	if result == 0 {
 		return callErr
 	}
-	if err = restore(h, windows.DACL_SECURITY_INFORMATION, original); err != nil {
+	if err = restore(h, windows.DACL_SECURITY_INFORMATION, writable); err != nil {
 		return fmt.Errorf("%w: content changed but exact DACL restoration failed: %v", errReplacementCommitted, err)
 	}
 	after, err := windows.GetSecurityInfo(h, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
