@@ -1,6 +1,6 @@
 # MCP Dev Runtime tool reference
 
-Project 1.1.0 keeps the six default stable tool names and contract 3.1 behavior, with optional history, filtering and log-query arguments. Launcher commands are CLI operations, not additional MCP tools.
+Project 1.2.0 keeps the six default stable tool names and contract 3.1 behavior, with optional history, filtering and log-query arguments. Launcher commands are CLI operations, not additional MCP tools. Native Windows uses a separate execution backend; its shell, cancellation and directory semantics are documented in [WINDOWS.md](WINDOWS.md).
 
 # 工具接口参考
 

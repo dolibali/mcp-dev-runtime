@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.2.0 — 2026-09-21
+
 - Add isolated Windows x64/ARM64 execution adapters using suspended-process Job assignment, ConPTY, framed output and actual exit codes. macOS/Linux keep their existing process backends and six stable tool contracts.
 - Add Windows user directories, private DACL checks, authenticated named-pipe lifecycle control, graceful MCP history shutdown, case-aware patch conflict checks and DACL-preserving file replacement.
 - Add native Windows ZIP build/verification, executable command wrappers, PowerShell install/uninstall, version-pointer upgrade/rollback and separate Windows CI jobs. No WSL, MSVC or globally installed Node/Go is required by the runtime packages.

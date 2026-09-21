@@ -2,7 +2,7 @@
 
 **English** | [简体中文](BINARY_INSTALL.zh-CN.md)
 
-The [v1.1.0 release](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.1.0) contains four platform-specific runtime archives. Each includes Node.js 24.21.0, the compiled application, production native dependencies, and the runtime-only Tunnel built from the exact commit in `tunnel.lock.json`. No system Node, npm, Git, Go or compiler is needed to install or run MDR. Tools required by your own development projects remain your responsibility.
+The [v1.2.0 release](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.2.0) contains six platform-specific runtime archives. Each includes Node.js 24.21.0, the compiled application, production native dependencies, and the runtime-only Tunnel built from the exact commit in `tunnel.lock.json`. Windows ZIPs also contain the native OS adapter. No system Node, npm, Git, Go or compiler is needed to install or run MDR. Tools required by your own development projects remain your responsibility.
 
 ## Choose and verify the download
 
@@ -12,19 +12,23 @@ The [v1.1.0 release](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1
 | `darwin-x64.tar.gz` | Intel Mac; macOS 15 |
 | `linux-x64-gnu.tar.gz` | x64; Ubuntu 22.04, glibc and GCC 12 libstdc++ |
 | `linux-arm64-gnu.tar.gz` | ARM64; Ubuntu 22.04, glibc and GCC 12 libstdc++ |
+| `win32-x64.zip` | Windows x64; Windows Server 2025 native runner, Windows 11 local acceptance |
+| `win32-arm64.zip` | Windows ARM64; Windows 11 ARM64 native runner |
 
-Other distributions/older OS releases are not asserted to be verified merely because they share an architecture. Alpine/musl and native Windows are not supported by these packages. Use `uname -s` and `uname -m` to identify the computer. Download the matching archive and `SHA256SUMS` from the same release, not GitHub's automatic source snapshot.
+Other distributions/older OS releases are not asserted to be verified merely because they share an architecture. Alpine/musl is not supported. On macOS/Linux use `uname -s` and `uname -m`; on Windows check your system architecture and follow the [Windows guide](WINDOWS.md). Download the matching archive and `SHA256SUMS` from the same release, not GitHub's automatic source snapshot.
+
+**Windows:** verify the ZIP with `Get-FileHash`, extract it and run `.\install.ps1` in PowerShell. Complete removal uses `uninstall.ps1`. Windows uses private DACLs and an atomic JSON version pointer, not Unix file modes or symlinks. The remaining shell examples and directory table on this page describe macOS/Linux; use the [Windows guide](WINDOWS.md) for the corresponding Windows paths and commands.
 
 On macOS, from the download directory:
 
 ```bash
-shasum -a 256 mcp-dev-runtime-1.1.0-darwin-arm64.tar.gz
+shasum -a 256 mcp-dev-runtime-1.2.0-darwin-arm64.tar.gz
 ```
 
 On Linux:
 
 ```bash
-sha256sum mcp-dev-runtime-1.1.0-linux-x64-gnu.tar.gz
+sha256sum mcp-dev-runtime-1.2.0-linux-x64-gnu.tar.gz
 ```
 
 Compare the entire hash with the matching filename in `SHA256SUMS`. Substitute your actual architecture filename. A checksum checks consistency, not publisher identity by itself. GitHub build provenance is available separately with `gh attestation verify ARCHIVE --repo dolibali/mcp-dev-runtime` for users who already have `gh`.
@@ -36,8 +40,8 @@ Compare the entire hash with the matching filename in `SHA256SUMS`. Substitute y
 For Apple Silicon, for example:
 
 ```bash
-tar -xzf mcp-dev-runtime-1.1.0-darwin-arm64.tar.gz
-cd mcp-dev-runtime-1.1.0-darwin-arm64
+tar -xzf mcp-dev-runtime-1.2.0-darwin-arm64.tar.gz
+cd mcp-dev-runtime-1.2.0-darwin-arm64
 ./install.sh
 ```
 

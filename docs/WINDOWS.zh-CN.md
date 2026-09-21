@@ -1,6 +1,6 @@
 # Windows 原生安装与开发
 
-本页说明**尚未发布的 Windows 适配实现**，不会改变已有 v1.1.0 附件。
+Windows 原生支持从 **v1.2.0** 开始提供，不会改变此前已经发布的附件。
 x64 和 ARM64 使用各自的原生 ZIP；ARM64 交叉编译成功不等于真机验收，
 发布流程要求对应的 Windows ARM64 原生 Runner 通过后才允许发布该产物。
 
@@ -14,6 +14,16 @@ Python、MSVC、Git Bash 或 WSL，也不要求管理员提升权限。Git、rip
 核对发行页 SHA-256，解压对应架构的 ZIP，在 PowerShell 中运行：
 
 ```powershell
+[Runtime.InteropServices.RuntimeInformation]::OSArchitecture
+Get-FileHash .\mcp-dev-runtime-1.2.0-win32-x64.zip -Algorithm SHA256
+```
+
+将完整哈希与同一发行页 `SHA256SUMS` 中的对应值比较。ARM64 系统将文件名
+中的 `win32-x64` 替换为 `win32-arm64`。确认一致后再解压安装：
+
+```powershell
+Expand-Archive -LiteralPath .\mcp-dev-runtime-1.2.0-win32-x64.zip -DestinationPath .\mdr-1.2.0
+Set-Location .\mdr-1.2.0\mcp-dev-runtime-1.2.0-win32-x64
 .\install.ps1
 ```
 

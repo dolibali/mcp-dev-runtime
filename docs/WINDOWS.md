@@ -1,7 +1,7 @@
 # Windows native installation and development
 
-This describes the **unreleased Windows implementation**, not an update to the
-published v1.1.0 assets. Windows x64 and ARM64 use separate native ZIP packages.
+Windows support is introduced in **v1.2.0**; older published assets are unchanged.
+Windows x64 and ARM64 use separate native ZIP packages.
 An ARM64 cross-build alone is not runtime verification: the release workflow
 requires a matching `windows-11-arm` runner to pass before publishing that asset.
 
@@ -17,6 +17,16 @@ Verify the release's SHA-256 checksum, extract the matching ZIP, and run from
 PowerShell:
 
 ```powershell
+[Runtime.InteropServices.RuntimeInformation]::OSArchitecture
+Get-FileHash .\mcp-dev-runtime-1.2.0-win32-x64.zip -Algorithm SHA256
+```
+
+Compare the full hash against `SHA256SUMS` from the same release. Use
+`win32-arm64` instead of `win32-x64` for an ARM64 system. After verification:
+
+```powershell
+Expand-Archive -LiteralPath .\mcp-dev-runtime-1.2.0-win32-x64.zip -DestinationPath .\mdr-1.2.0
+Set-Location .\mdr-1.2.0\mcp-dev-runtime-1.2.0-win32-x64
 .\install.ps1
 ```
 

@@ -45,4 +45,4 @@ npm run test:all
 - Missing credentials: use exported values, `--env-file runtime.env`, or explicitly opt into `--shell-env`. Never paste key values into issues.
 - Stale/unreachable supervisor: inspect `.runtime/launcher.log` and the state record. `down` never signals an arbitrary saved PID.
 - Long state-directory path: use a shorter `--state-dir` because POSIX local socket paths have size limits.
-- Windows: unsupported intentionally; do not bypass the platform check and report it as native compatibility.
+- Windows: use the matching v1.2.0+ native x64/ARM64 ZIP and [Windows guide](WINDOWS.md). PowerShell 5.1 does not accept Bash syntax or PowerShell 7's `&&`/`||`. Do not disable organization execution policies or security software to force startup; inspect the reported shell, permissions and package identity instead.

@@ -1,6 +1,6 @@
 {
   "name": "mcp-dev-runtime",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Local development tools over MCP: shell, terminal sessions, patches and images. No agent or model calls.",
   "scripts": {
     "setup": "node scripts/platform-entry.mjs setup",

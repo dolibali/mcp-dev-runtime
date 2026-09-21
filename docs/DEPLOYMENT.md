@@ -4,10 +4,10 @@
 
 For end-user installation use [BINARY_INSTALL.md](BINARY_INSTALL.md) / [中文预编译安装](BINARY_INSTALL.zh-CN.md). v1.0.1 and later use one non-secret `config.json` plus private `runtime.env`; the published v1.0.0 keeps its original split configuration. Existing `launcher.config.json + config.json` installations remain supported without automatic migration. Binary packages include Node and Tunnel, so source-oriented npm/build instructions are not run inside an installed binary package.
 
-Binary `init` only creates missing private config files and never copies credentials or starts a service. `paths`, `config`, `tools` and `status` report effective paths/policy without printing credential contents. Publisher signing/notarization are deliberately skipped for v1.1.0.
+Binary `init` only creates missing private config files and never copies credentials or starts a service. `paths`, `config`, `tools` and `status` report effective paths/policy without printing credential contents. Publisher signing/notarization are deliberately skipped for v1.2.0.
 
 
-First-time installation: [English README](../README.md#install) | [中文部署指南](README.zh-CN.md#install). This page is the operational reference for project 1.1.0 / contract 3.1.
+First-time installation: [English README](../README.md#install) | [中文部署指南](README.zh-CN.md#install). This page is the operational reference for project 1.2.0 / contract 3.1.
 
 For the complete browser-to-terminal walkthrough, including developer mode and where to create keys and copy Tunnel IDs, see [ChatGPT setup](CHATGPT_SETUP.md) / [ChatGPT 新手图文教程](CHATGPT_SETUP.zh-CN.md).
 
@@ -132,7 +132,7 @@ MCP and Tunnel diagnostic logs rotate during writes using `log_max_bytes` (defau
 
 ## Platforms
 
-Windows native is explicitly rejected. Linux and macOS use POSIX shells, node-pty and process groups. The default portable example uses `/bin/bash`; use a host-appropriate shell path in local config. PTY and image library installation require compatible native artifacts or the usual compiler toolchain. Tests do not require a graphical session.
+v1.2.0 adds native Windows x64/ARM64 packages with a separate PowerShell/ConPTY and Job Object backend; see [Windows installation and semantics](WINDOWS.md). Linux and macOS keep POSIX shells, node-pty and process groups. POSIX examples use `/bin/bash`; Windows generates a host-appropriate PowerShell path and does not require Bash or WSL. Precompiled packages carry the runtime/native dependencies; source builders need their platform's build prerequisites. Tests do not require a graphical session.
 
 ## Changing an existing installation
 

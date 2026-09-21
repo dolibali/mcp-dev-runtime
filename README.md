@@ -8,7 +8,7 @@ Shell commands, interactive terminals, file patches, images and execution histor
 
 **New in v1.1.0 (opt-in experimental):** [Local Skills](docs/SKILLS.md) provides `discover_skills` / `read_skill`, bounded project/global discovery and complete instruction reading. Disabled by default; the six established tools and their schemas remain unchanged. No additional agent or model is invoked.
 
-**Windows development (unreleased):** Native Windows x64/ARM64 build targets, PowerShell/ConPTY execution and user-scoped ZIP installation are described in the [Windows guide](docs/WINDOWS.md). Published v1.1.0 archives remain macOS/Linux only. Cross-built ARM64 components are not a substitute for the required native ARM64 release acceptance.
+**New in v1.2.0:** Native Windows x64/ARM64 ZIPs with PowerShell/ConPTY execution, owned process-tree cleanup and user-scoped installation. See the [Windows guide](docs/WINDOWS.md). Each architecture must pass its native release tests; cross-compilation is not accepted as runtime verification.
 
 **First time connecting ChatGPT?** Follow the [illustrated, click-by-click setup guide](docs/CHATGPT_SETUP.md): enable developer mode, create a Tunnel and API key, start the local service, and select the Tunnel in ChatGPT.
 
@@ -16,7 +16,7 @@ This is an independent community project, not an OpenAI product. The runtime exe
 
 > **Trust boundary:** commands run with the service user's OS permissions. There is no sandbox, command allowlist, additional approval layer or multi-user isolation. Keep the listener on loopback and connect only trusted clients. Returned files, logs and images reach the calling client; local execution does not mean local-only data handling. Read [SECURITY.md](SECURITY.md) before connecting a machine.
 
-**Precompiled v1.1.0:** [Download the matching runtime package](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.1.0) · [Installation and upgrade guide](docs/BINARY_INSTALL.md). Includes Node, native dependencies and the pinned Tunnel; no build toolchain is needed. Publisher signing / Apple notarization are skipped for this release.
+**Precompiled v1.2.0:** [Download the matching runtime package](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.2.0) · [Installation and upgrade guide](docs/BINARY_INSTALL.md). Includes Node, native dependencies and the pinned Tunnel; no build toolchain is needed. Publisher signing / Apple notarization are skipped for this release.
 
 ## Contents
 
@@ -59,7 +59,7 @@ Arrows show **request/response data flow**, not who opens an inbound network con
 <a id="requirements"></a>
 ## Requirements
 
-For the recommended **precompiled distribution**, use a matching supported macOS/Linux package; no external Node/npm/Go/compiler is required. See [binary installation](docs/BINARY_INSTALL.md). The table below applies to **source development**, not the release installer.
+For the recommended **precompiled distribution**, use a matching macOS/Linux tarball or Windows x64/ARM64 ZIP; no external Node/npm/Go/compiler is required. See [binary installation](docs/BINARY_INSTALL.md) and [Windows installation](docs/WINDOWS.md). The table below applies to **macOS/Linux source development**, not the release installer. Windows source development requires Node/npm and the pinned Go toolchain, without MSVC or WSL.
 
 | Requirement | When needed |
 | --- | --- |
@@ -80,16 +80,18 @@ rg --version
 
 On macOS, install Xcode Command Line Tools with `xcode-select --install` if native builds require them. On Debian/Ubuntu, the usual native build dependencies are `build-essential`, `python3` and `pkg-config`; install Node.js separately and confirm it meets the requirement. See [node-pty's build prerequisites](https://github.com/microsoft/node-pty#dependencies). Do not run this project with `sudo`.
 
-Precompiled package verification runs natively on macOS 14 ARM64, macOS 15 Intel, and Ubuntu 22.04 x64/ARM64. Exact package checks are published in `VERIFICATION.json`; mock Tunnel lifecycle tests do not claim real cloud connectivity. Source regression checkpoints remain in [VALIDATION.md](docs/VALIDATION.md).
+Precompiled release verification requires macOS 14 ARM64, macOS 15 Intel, Ubuntu 22.04 x64/ARM64, Windows Server 2025 x64 and Windows 11 ARM64 native runners. Exact package results are published in `VERIFICATION.json`; mock/local lifecycle tests do not claim real cloud connectivity. Source regression checkpoints remain in [VALIDATION.md](docs/VALIDATION.md).
 
 <a id="install"></a>
 ## 1. Install
 
-**Recommended:** download a [precompiled release](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.1.0), verify its SHA-256, extract it and run its `./install.sh`. The [binary guide](docs/BINARY_INSTALL.md) covers user directories, commands, coexistence, upgrade and rollback. This installer does not compile or download dependencies.
+**Recommended:** download a [precompiled release](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.2.0), verify its SHA-256, extract it and run `./install.sh` on macOS/Linux or `.\install.ps1` in Windows PowerShell. The [binary guide](docs/BINARY_INSTALL.md) and [Windows guide](docs/WINDOWS.md) cover user directories, commands, upgrade and rollback. Release installers do not compile or download dependencies.
 
 **v1.0.1 and later:** complete uninstall is `./uninstall.sh`. It lists every owned path it will remove and proceeds only after the user enters `y`; precompiled installation also preserves a stable user-level copy so the downloaded archive does not need to be kept. The immutable v1.0.0 archive predates this feature and retains its command-only `./install.sh --unregister`.
 
 ### Source development alternative
+
+The shell commands below target macOS/Linux. For native Windows source setup, use the [Windows source guide](docs/WINDOWS.md#source-development-and-validation) instead; do not install Bash or WSL merely to run these examples.
 
 Clone the repository below; a private repository requires an account with access. For a fork, use its clone URL instead. For an extracted source archive, skip cloning and enter the extracted project directory.
 

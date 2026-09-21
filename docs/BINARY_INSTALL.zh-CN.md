@@ -2,7 +2,7 @@
 
 [English](BINARY_INSTALL.md) | **简体中文**
 
-[v1.1.0 发行页](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.1.0)提供四种平台运行包。每包内置 Node.js 24.21.0、编译后的应用、对应平台的原生依赖，以及按照 `tunnel.lock.json` 精确 commit 构建的 runtime-only Tunnel。安装和运行 MDR 不要求系统另装 Node、npm、Git、Go 或编译器；你自己的开发项目需要的工具仍由自己的环境提供。
+[v1.2.0 发行页](https://github.com/dolibali/mcp-dev-runtime/releases/tag/v1.2.0)提供六种平台运行包。每包内置 Node.js 24.21.0、编译后的应用、对应平台的原生依赖，以及按照 `tunnel.lock.json` 精确 commit 构建的 runtime-only Tunnel；Windows ZIP 另含原生系统适配程序。安装和运行 MDR 不要求系统另装 Node、npm、Git、Go 或编译器，你自己的开发项目需要的工具仍由自己的环境提供。
 
 ## 选择并校验下载文件
 
@@ -12,19 +12,23 @@
 | `darwin-x64.tar.gz` | Intel Mac，macOS 15 |
 | `linux-x64-gnu.tar.gz` | x64，Ubuntu 22.04，glibc 和 GCC 12 的 libstdc++ |
 | `linux-arm64-gnu.tar.gz` | ARM64，Ubuntu 22.04，glibc 和 GCC 12 的 libstdc++ |
+| `win32-x64.zip` | Windows x64；Windows Server 2025 原生 Runner 与 Windows 11 本地验收 |
+| `win32-arm64.zip` | Windows ARM64；Windows 11 ARM64 原生 Runner |
 
-不能仅凭架构相同就推断其他发行版或更旧系统也已经验证。当前运行包不支持 Alpine/musl 和原生 Windows。可以用 `uname -s`、`uname -m` 查看系统与架构。从同一个 Release 下载对应压缩包及 `SHA256SUMS`，不要选 GitHub 自动生成的源码快照。
+不能仅凭架构相同就推断其他发行版或更旧系统也已经验证。当前运行包不支持 Alpine/musl。macOS/Linux 可用 `uname -s`、`uname -m` 查看系统与架构；Windows 请按 [Windows 指南](WINDOWS.zh-CN.md)检查系统架构。从同一个 Release 下载压缩包和 `SHA256SUMS`，不要选 GitHub 自动生成的源码快照。
+
+**Windows：**使用 `Get-FileHash` 核对 ZIP，解压后在 PowerShell 执行 `.\install.ps1`；完整卸载使用 `uninstall.ps1`。Windows 使用私人 DACL 和原子 JSON 版本指针，不使用 Unix 权限位或符号链接。本页后续 Shell 示例和目录表针对 macOS/Linux；Windows 的具体路径和操作见 [Windows 指南](WINDOWS.zh-CN.md)。
 
 macOS 在下载目录执行：
 
 ```bash
-shasum -a 256 mcp-dev-runtime-1.1.0-darwin-arm64.tar.gz
+shasum -a 256 mcp-dev-runtime-1.2.0-darwin-arm64.tar.gz
 ```
 
 Linux 执行：
 
 ```bash
-sha256sum mcp-dev-runtime-1.1.0-linux-x64-gnu.tar.gz
+sha256sum mcp-dev-runtime-1.2.0-linux-x64-gnu.tar.gz
 ```
 
 将整段哈希与 `SHA256SUMS` 中对应文件名的值核对；文件名替换为实际架构。哈希用于核对一致性，本身不代表发布者身份。已安装 `gh` 的用户还可以执行 `gh attestation verify ARCHIVE --repo dolibali/mcp-dev-runtime`，查看独立的 GitHub 构建来源证明。
@@ -36,8 +40,8 @@ sha256sum mcp-dev-runtime-1.1.0-linux-x64-gnu.tar.gz
 以 Apple Silicon 为例：
 
 ```bash
-tar -xzf mcp-dev-runtime-1.1.0-darwin-arm64.tar.gz
-cd mcp-dev-runtime-1.1.0-darwin-arm64
+tar -xzf mcp-dev-runtime-1.2.0-darwin-arm64.tar.gz
+cd mcp-dev-runtime-1.2.0-darwin-arm64
 ./install.sh
 ```
 

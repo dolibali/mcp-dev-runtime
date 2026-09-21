@@ -4,7 +4,7 @@ The project, tool contract and upstream Tunnel have different release boundaries
 
 | Identity | Source of truth | Purpose |
 | --- | --- | --- |
-| Project version | `package.json` and npm lock | Runtime/launcher release, currently 1.1.0 |
+| Project version | `package.json` and npm lock | Runtime/launcher release, currently 1.2.0 |
 | Tool contract | `CONTRACT_VERSION`, tool JSON | Observable tool behavior, currently 3.1 |
 | Tunnel source version | `tunnel.lock.json` | Upstream informational version, currently 0.0.14 |
 | Tunnel source commit | lock + submodule gitlink | Exact compatibility input, currently 70bb5a7… |
