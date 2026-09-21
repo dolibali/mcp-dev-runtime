@@ -95,8 +95,12 @@ func replaceFileWithRestore(source, destination string, restore func(windows.Han
 	if err = restore(h, windows.DACL_SECURITY_INFORMATION, writable); err != nil {
 		return fmt.Errorf("%w: content changed but exact DACL restoration failed: %v", errReplacementCommitted, err)
 	}
-	after, err := windows.GetSecurityInfo(h, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
-	if err != nil || after.String() != original.String() {
+	// Read back using the same named-file API used for the snapshot. On Windows
+	// Server, named and open-handle queries can serialize inherited ACL state
+	// differently even though a fresh named-file query exactly matches the saved
+	// descriptor. Do not compare results from those different query paths.
+	after, err := windows.GetNamedSecurityInfo(longPath(destination), windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
+	if err != nil || after == nil || after.String() != original.String() {
 		return fmt.Errorf("%w: content changed but exact DACL verification failed", errReplacementCommitted)
 	}
 	return nil
