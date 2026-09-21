@@ -51,7 +51,7 @@ func daclFixture(t *testing.T, protected bool, inherited bool) (string, string, 
 	if err = windows.SetKernelObjectSecurity(h, windows.DACL_SECURITY_INFORMATION, sd); err != nil {
 		t.Fatal(err)
 	}
-	before, err := windows.GetSecurityInfo(h, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
+	before, err := windows.GetSecurityInfo(h, windows.SE_FILE_OBJECT, fileAccessInformation)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,7 @@ func TestReplacementPreservesExactLegacyAndProtectedDACL(t *testing.T) {
 			if err := replaceFile(source, destination); err != nil {
 				t.Fatal(err)
 			}
-			after, err := windows.GetNamedSecurityInfo(destination, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
+			after, err := windows.GetNamedSecurityInfo(destination, windows.SE_FILE_OBJECT, fileAccessInformation)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -125,5 +125,35 @@ func TestReplacementPreservesDefaultFileDACL(t *testing.T) {
 		newControl, _, _ := after.Control()
 		daclAfter, queryErr := windows.GetNamedSecurityInfo(longPath(destination), windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
 		t.Fatalf("default fixture DACL changed: error=%v, controls=%x/%x, before=%s, after=%s, dacl-only-before=%s, supplied=%s, dacl-only-after=%v, query-error=%v", replaceErr, oldControl, newControl, before.String(), after.String(), daclBefore.String(), supplied, daclAfter, queryErr)
+	}
+}
+
+func TestReplacementRepeatedlyPreservesAllComparedSecurityFields(t *testing.T) {
+	root := t.TempDir()
+	destination := filepath.Join(root, "default.txt")
+	if err := os.WriteFile(destination, []byte("original"), 0666); err != nil {
+		t.Fatal(err)
+	}
+	before, err := windows.GetNamedSecurityInfo(destination, windows.SE_FILE_OBJECT, fileAccessInformation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 4; i++ {
+		source := filepath.Join(root, "replacement.txt")
+		if err := os.WriteFile(source, []byte("replacement"), 0666); err != nil {
+			t.Fatal(err)
+		}
+		if err := replaceFile(source, destination); err != nil {
+			t.Fatalf("replacement %d: %v", i, err)
+		}
+		after, err := windows.GetNamedSecurityInfo(destination, windows.SE_FILE_OBJECT, fileAccessInformation)
+		if err != nil {
+			t.Fatal(err)
+		}
+		owner, _, ownerErr := after.Owner()
+		group, _, groupErr := after.Group()
+		if ownerErr != nil || groupErr != nil || owner == nil || group == nil || after.String() != before.String() {
+			t.Fatalf("replacement %d changed or omitted owner/group/DACL: %s -> %s", i, before.String(), after.String())
+		}
 	}
 }

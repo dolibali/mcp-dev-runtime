@@ -1,5 +1,22 @@
 # Validation record
 
+## v1.2.0 native release security-descriptor correction
+
+Native Windows release runners exposed a false post-replacement verification
+failure: a DACL-only query could incidentally return owner/group fields before
+replacement and omit those unrequested fields afterwards. The comparison now
+explicitly requests owner, group and DACL on both sides and still requires the
+complete requested descriptor to match. No permissions check is skipped and
+post-commit restoration failures remain reported as partial file changes.
+
+The local correction checkpoint passed **254 source tests** (141 unit, 41 protocol,
+72 launcher), CLI verification and static release checks. All **six native Go
+tests** passed three consecutive executions on the authorized Windows x64 host,
+including default, inherited/protected and repeated replacement cases. Release
+publication additionally requires the normal native x64/ARM64 Windows jobs and
+all four existing macOS/Linux package jobs to pass for the exact release commit;
+the attached release verification record is authoritative for those runs.
+
 ## Windows native adaptation — unreleased development checkpoint
 
 The Windows work is based on v1.1.0 commit

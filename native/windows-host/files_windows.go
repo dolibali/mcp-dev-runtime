@@ -28,6 +28,13 @@ func longPath(p string) string {
 // A post-replacement failure must be reported as a partial file change.
 var errReplacementCommitted = errors.New("WINDOWS_REPLACEMENT_COMMITTED")
 
+// SECURITY_DESCRIPTOR.String includes owner/group whenever they are present.
+// Request all compared fields explicitly: a DACL-only query may incidentally
+// include owner/group before replacement and omit them after SetKernelObjectSecurity.
+// Comparing those partial descriptors reports a false post-commit failure even
+// when the complete owner/group/DACL snapshot is unchanged.
+const fileAccessInformation = windows.OWNER_SECURITY_INFORMATION | windows.GROUP_SECURITY_INFORMATION | windows.DACL_SECURITY_INFORMATION
+
 func replaceFile(source, destination string) error {
 	return replaceFileWithRestore(source, destination, windows.SetKernelObjectSecurity)
 }
@@ -55,7 +62,7 @@ func replaceFileWithRestore(source, destination string, restore func(windows.Han
 	if err != nil {
 		return err
 	}
-	original, err := windows.GetNamedSecurityInfo(longPath(destination), windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
+	original, err := windows.GetNamedSecurityInfo(longPath(destination), windows.SE_FILE_OBJECT, fileAccessInformation)
 	if err != nil {
 		return fmt.Errorf("read destination DACL before replacement: %w", err)
 	}
@@ -95,11 +102,9 @@ func replaceFileWithRestore(source, destination string, restore func(windows.Han
 	if err = restore(h, windows.DACL_SECURITY_INFORMATION, writable); err != nil {
 		return fmt.Errorf("%w: content changed but exact DACL restoration failed: %v", errReplacementCommitted, err)
 	}
-	// Read back using the same named-file API used for the snapshot. On Windows
-	// Server, named and open-handle queries can serialize inherited ACL state
-	// differently even though a fresh named-file query exactly matches the saved
-	// descriptor. Do not compare results from those different query paths.
-	after, err := windows.GetNamedSecurityInfo(longPath(destination), windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
+	// Verify every requested field with the same query mask. Restoring only the
+	// DACL must not silently change the owner or group either.
+	after, err := windows.GetNamedSecurityInfo(longPath(destination), windows.SE_FILE_OBJECT, fileAccessInformation)
 	if err != nil || after == nil || after.String() != original.String() {
 		return fmt.Errorf("%w: content changed but exact DACL verification failed", errReplacementCommitted)
 	}
