@@ -214,6 +214,84 @@ mdr smoke
 
 **本步完成标志：**本地服务和诊断就绪。保持电脑开机联网；下一步仍需通过 ChatGPT 实际调用来验证完整链路。
 
+### Windows / 代理环境：本地检查正常，但 ChatGPT 创建应用失败
+
+`mdr doctor` 和 `mdr smoke` 通过，只能证明本地 MCP、工具发现和受管 Tunnel 进程处于就绪状态；它们不等同于一次真实的 ChatGPT / WAN 往返。`doctor` 的诊断结果也会明确标注其 scope 不包含 remote ChatGPT round trip。
+
+在 Windows 上，如果浏览器可以正常使用 ChatGPT，但在第 7 步创建应用时只看到 `Something went wrong`、`fetch failed` 或连接超时，先不要重复安装 MDR、重建 Tunnel 或更换 API Key。先确认启动 `tunnel-client` 的进程能否实际访问 OpenAI 控制面。
+
+PowerShell 中先测试直连：
+
+```powershell
+curl.exe -I --connect-timeout 10 https://api.openai.com/
+```
+
+只要能收到 HTTP 响应，就说明 TCP/TLS/HTTP 路径已经建立；这里不要求根路径一定返回 `200`。如果直连超时，而电脑本来就通过本地 HTTP / Mixed 代理访问外网，再显式测试代理端口：
+
+```powershell
+curl.exe -I `
+  --proxy http://127.0.0.1:7890 `
+  --connect-timeout 10 `
+  https://api.openai.com/
+```
+
+把 `7890` 替换为自己代理软件的真实 HTTP / Mixed 端口。若先看到：
+
+```text
+HTTP/1.1 200 Connection established
+```
+
+随后收到 `api.openai.com` / Cloudflare 的 HTTP 响应（即使根路径状态码不是 `200`），说明代理出口已经可以到达 OpenAI。OpenAI `tunnel-client` 在没有配置显式代理参数时会遵循标准的 `HTTP_PROXY`、`HTTPS_PROXY`、`NO_PROXY` 环境变量。
+
+Windows 预编译安装默认可在下面的私人环境文件中加入代理：
+
+```text
+%LOCALAPPDATA%\mcp-dev-runtime\runtime.env
+```
+
+例如：
+
+```dotenv
+HTTPS_PROXY=http://127.0.0.1:7890
+HTTP_PROXY=http://127.0.0.1:7890
+NO_PROXY=localhost,127.0.0.1,::1
+```
+
+`NO_PROXY` 很重要：访问 `api.openai.com` 的控制面流量可以走代理，而本机 `127.0.0.1:3001/mcp` 仍应直接回环，不必绕过代理服务器。
+
+已经运行的 MDR / Tunnel 进程不会热重载 `runtime.env`。确认没有需要保留的活动任务后重启：
+
+```powershell
+mdr stop
+mdr start --bg
+mdr status --verbose
+mdr doctor
+```
+
+确认 MCP 与 Tunnel 都重新显示 `ready` 后，再回到 ChatGPT 创建应用。
+
+一次实际 Windows 排障路径如下：
+
+```text
+doctor / smoke 均通过
+        ↓
+ChatGPT 能看到并选择 Tunnel
+        ↓
+创建应用时报 Something went wrong
+        ↓
+curl 直连 api.openai.com 超时
+        ↓
+curl 显式走本地代理可以到达 OpenAI
+        ↓
+runtime.env 加入 HTTP_PROXY / HTTPS_PROXY / NO_PROXY
+        ↓
+重启 MDR
+        ↓
+ChatGPT 应用创建成功
+```
+
+这个现象的关键点是：**浏览器能访问 ChatGPT，不代表作为独立 Windows 进程运行的 `tunnel-client` 一定使用了相同的网络出口。**
+
 <a id="step-7"></a>
 ## 第 7 步：在 ChatGPT 创建应用，Connection 选 Tunnel
 
@@ -291,7 +369,8 @@ mdr smoke
 | 403 / Tunnels access required | 区分创建所需 Manage 与运行所需 Use；主体权限和密钥权限都要满足 |
 | `No compatible Tunnel binary` | 按第 6 步准备依赖并构建固定源码；不跳过版本校验 |
 | `address already in use` | 是否同时启动 `npm start` 与 `npm run up`；不要随意终止其他应用 |
-| `fetch failed` 或连接超时 | 区分本地 MCP 健康失败和 Tunnel 出站网络、代理、TLS 失败，查看对应服务日志；不要靠关闭证书验证消除错误 |
+| `fetch failed` 或连接超时 | 区分本地 MCP 健康失败和 Tunnel 出站网络、代理、TLS 失败；Windows 可先按上面的代理排障流程对比 `curl` 直连与显式代理结果；不要靠关闭证书验证消除错误 |
+| Tunnel 可见，但创建应用时报 `Something went wrong` | 若 `doctor` / `smoke` 已通过，优先检查 `tunnel-client` 到 `api.openai.com:443` 的真实网络出口；需要代理时在 `runtime.env` 配置 `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY`，重启 MDR 后再试 |
 | Scan Tools 失败 | MCP 与 Tunnel 是否都在运行；本机执行 `status`、`doctor`、`smoke`；确认 MCP 认证未误选 OAuth |
 | 对话说无法用工具 | 确认本对话已选中应用，工具未禁用，权限提示已处理；以真实工具返回为准 |
 | 新参数没出现 | 服务升级后重新加载，再在应用详情刷新工具定义，必要时新建对话；两个步骤不是一回事 |
