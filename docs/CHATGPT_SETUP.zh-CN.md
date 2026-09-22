@@ -156,12 +156,28 @@ Organization ID 可在 [Platform 组织 General](https://platform.openai.com/set
 <a id="step-5"></a>
 ## 第 5 步：填写本机凭据文件
 
-安装器已经创建私人 `runtime.env`，并配置 MDR 读取它。用 `mdr paths` 找到实际配置，再用纯文本编辑器打开旁边的 `runtime.env`。默认位置是 macOS `~/Library/Application Support/mcp-dev-runtime/runtime.env`、Linux `~/.config/mcp-dev-runtime/runtime.env`；绝对路径 XDG 覆盖项会生效。
+安装器已经创建私人 `runtime.env`，并配置 MDR 读取它。用 `mdr paths` 找到实际配置，再用纯文本编辑器打开旁边的 `runtime.env`。默认位置为：
+
+- macOS：`~/Library/Application Support/mcp-dev-runtime/runtime.env`
+- Linux：`~/.config/mcp-dev-runtime/runtime.env`（绝对路径 XDG 覆盖项会生效）
+- Windows：`%LOCALAPPDATA%\mcp-dev-runtime\runtime.env`，通常展开为 `C:\Users\<用户名>\AppData\Local\mcp-dev-runtime\runtime.env`
 
 macOS 默认路径可执行：
 
 ```bash
 nano "$HOME/Library/Application Support/mcp-dev-runtime/runtime.env"
+```
+
+Linux 默认路径可执行：
+
+```bash
+nano "$HOME/.config/mcp-dev-runtime/runtime.env"
+```
+
+Windows PowerShell 默认路径可执行：
+
+```powershell
+notepad "$env:LOCALAPPDATA\mcp-dev-runtime\runtime.env"
 ```
 
 把下面两个值改为自己的真实凭据，一行一个：
@@ -171,7 +187,7 @@ CONTROL_PLANE_TUNNEL_ID=tunnel_00000000000000000000000000000000
 CONTROL_PLANE_API_KEY=replace-with-your-own-runtime-key
 ```
 
-这些示例**不是可用凭据**。不要加入中文引号、Markdown 反引号或换行。在 nano 用 **Control+O → Enter** 保存，再 **Control+X** 退出；不是 Command。不要截图、打印或将密钥发到聊天/Git，文件应保持私人权限 `0600`。密钥泄露应撤销并换新，不是仅从最新文本删除。参考[官方密钥安全说明](https://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety)。
+这些示例**不是可用凭据**。不要加入中文引号、Markdown 反引号或换行。macOS/Linux 使用 nano 时，用 **Control+O → Enter** 保存，再用 **Control+X** 退出；不是 Command。Windows 使用记事本时正常保存即可。不要截图、打印或将密钥发到聊天/Git。macOS/Linux 文件应保持私人权限 `0600`；Windows 使用安装器设置的私有 DACL，而不是 POSIX 权限位。密钥泄露应撤销并换新，不是仅从最新文本删除。参考[官方密钥安全说明](https://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety)。
 
 当前统一配置会设置 `runtime.env_file: "runtime.env"`，并相对配置目录解析。已导出的非空凭据环境变量仍优先。已有旧 split 安装继续沿用自己的 launcher/env 设置，不会自动迁移凭据。
 

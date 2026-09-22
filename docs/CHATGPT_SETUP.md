@@ -156,12 +156,28 @@ The key's principal must independently have Read + Use on that tunnel; selecting
 <a id="step-5"></a>
 ## Step 5 — Fill the local credentials file
 
-The installer already created a private `runtime.env` and configured MDR to read it. Use `mdr paths` to locate the effective config, then open the adjacent `runtime.env` with a plain-text editor. Defaults are macOS `~/Library/Application Support/mcp-dev-runtime/runtime.env` and Linux `~/.config/mcp-dev-runtime/runtime.env` (absolute XDG overrides are respected).
+The installer already created a private `runtime.env` and configured MDR to read it. Use `mdr paths` to locate the effective config, then open the adjacent `runtime.env` with a plain-text editor. Default locations are:
+
+- macOS: `~/Library/Application Support/mcp-dev-runtime/runtime.env`
+- Linux: `~/.config/mcp-dev-runtime/runtime.env` (absolute XDG overrides are respected)
+- Windows: `%LOCALAPPDATA%\mcp-dev-runtime\runtime.env`, normally `C:\Users\<username>\AppData\Local\mcp-dev-runtime\runtime.env`
 
 For the macOS default:
 
 ```bash
 nano "$HOME/Library/Application Support/mcp-dev-runtime/runtime.env"
+```
+
+For the Linux default:
+
+```bash
+nano "$HOME/.config/mcp-dev-runtime/runtime.env"
+```
+
+For the Windows default in PowerShell:
+
+```powershell
+notepad "$env:LOCALAPPDATA\mcp-dev-runtime\runtime.env"
 ```
 
 Replace the two values with your own real credentials, one per line:
@@ -171,7 +187,7 @@ CONTROL_PLANE_TUNNEL_ID=tunnel_00000000000000000000000000000000
 CONTROL_PLANE_API_KEY=replace-with-your-own-runtime-key
 ```
 
-These example values are **not valid credentials**. Do not include smart quotes, Markdown backticks or embedded line breaks. In nano use **Control+O → Enter**, then **Control+X** (Control, not Command). Do not screenshot, print or paste the secret into chat/Git; keep the file private mode `0600`. A leaked key should be revoked/replaced, not only removed from the latest text. [Official API-key safety guidance](https://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety).
+These example values are **not valid credentials**. Do not include smart quotes, Markdown backticks or embedded line breaks. On macOS/Linux, when using nano, save with **Control+O → Enter**, then exit with **Control+X** (Control, not Command). On Windows, save normally in Notepad. Do not screenshot, print or paste the secret into chat/Git. macOS/Linux keep the file at private mode `0600`; Windows uses the installer's private DACL instead of POSIX mode bits. A leaked key should be revoked/replaced, not only removed from the latest text. [Official API-key safety guidance](https://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety).
 
 Current unified configuration sets `runtime.env_file: "runtime.env"`, resolved from the config directory. Nonempty exported credential variables still take precedence. Existing legacy split installations keep their launcher/env settings; no credential migration is automatic.
 
